@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.models.page import Page
+from app.services.page import PageService
 from app.schemas.page import (
     PageCreate,
     PageUpdate,
@@ -14,22 +14,27 @@ router = APIRouter(prefix="/pages", tags=["pages"])
 
 @router.post("/", response_model=PageResponse, status_code=status.HTTP_201_CREATED)
 def create_page(page: PageCreate, db: Session = Depends(get_db)):
-    db_page = Page(**page.model_dump())
-    db.add(db_page)
-    db.commit()
-    db.refresh(db_page)
-    return db_page
+    try:
+        service = PageService(db)
+        return service.create(page.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[PageResponse])
 def get_pages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(Page).offset(skip).limit(limit).all()
+    service = PageService(db)
+    return service.get_multi(skip=skip, limit=limit)
 
 @router.get("/{page_id}", response_model=PageResponse)
 def get_page(page_id: int, db: Session = Depends(get_db)):
-    db_page = db.query(Page).filter(Page.id == page_id).first()
-    if db_page is None:
-        raise HTTPException(status_code=404, detail="Page not found")
-    return db_page
+    try:
+        service = PageService(db)
+        page = service.get(page_id)
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+        return page
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/{page_id}", response_model=PageResponse)
 def update_page(
@@ -37,23 +42,19 @@ def update_page(
     page: PageUpdate,
     db: Session = Depends(get_db)
 ):
-    db_page = db.query(Page).filter(Page.id == page_id).first()
-    if db_page is None:
-        raise HTTPException(status_code=404, detail="Page not found")
-    
-    for key, value in page.model_dump(exclude_unset=True).items():
-        setattr(db_page, key, value)
-    
-    db.commit()
-    db.refresh(db_page)
-    return db_page
+    try:
+        service = PageService(db)
+        updated_page = service.update(page_id, page.model_dump(exclude_unset=True))
+        if not updated_page:
+            raise HTTPException(status_code=404, detail="Page not found")
+        return updated_page
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{page_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_page(page_id: int, db: Session = Depends(get_db)):
-    db_page = db.query(Page).filter(Page.id == page_id).first()
-    if db_page is None:
-        raise HTTPException(status_code=404, detail="Page not found")
-    
-    db.delete(db_page)
-    db.commit()
-    return None
+    try:
+        service = PageService(db)
+        service.delete(page_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
