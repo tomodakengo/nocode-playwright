@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.0",
     "@playwright/test": "^1.50.1",
     "@types/sqlite3": "^3.1.11",
     "date-fns": "^4.1.0",
