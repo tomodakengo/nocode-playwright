@@ -6,7 +6,7 @@ Docker環境の構築
 CI/CD (GitHub Actions)の設定
 ## 技術スタックの選定
 フロントエンド・バックエンド：NextJS
-データベース: PostgreSQL（オープンソース、JSON対応）
+データベース: SQLite3
 デザイン: TailwindCSS
 コンテナ管理: Docker Compose
 # フェーズ2: コアエンジンの実装
