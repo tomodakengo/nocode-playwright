@@ -26,3 +26,4 @@ class TestSuite(Base):
     
     project = relationship("Project", back_populates="test_suites")
     test_cases = relationship("TestCase", back_populates="test_suite", cascade="all, delete-orphan")
+    executions = relationship("TestExecution", back_populates="test_suite", cascade="all, delete-orphan")
