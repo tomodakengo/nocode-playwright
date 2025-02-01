@@ -66,9 +66,7 @@ export default function TestStepForm({
         setActionTypes(actionTypesData);
 
         // セレクタの取得
-        const selectorsResponse = await fetch(
-          `/api/pages/${testCaseId}/selectors`
-        );
+        const selectorsResponse = await fetch(`/api/pages/selectors`);
         if (!selectorsResponse.ok) {
           throw new Error("セレクタの取得に失敗しました");
         }
@@ -302,6 +300,7 @@ export default function TestStepForm({
           onChange={handleChange}
           rows={3}
           className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="ステップの説明を入力"
         />
       </div>
 
