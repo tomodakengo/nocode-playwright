@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { initializeDatabase } from '@/lib/db/init';
+import { Database } from 'sqlite';
+import sqlite3 from 'sqlite3';
 
 // テストスイート詳細の取得
 export async function GET(
@@ -7,61 +9,46 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const db = await initializeDatabase();
+        const db = await Promise.race([
+            initializeDatabase(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+            )
+        ]) as Database<sqlite3.Database>;
 
-        return new Promise((resolve, reject) => {
-            db.get(
-                `SELECT 
-          ts.*,
-          COUNT(tc.id) as test_case_count
-        FROM test_suites ts
-        LEFT JOIN test_cases tc ON ts.id = tc.suite_id
-        WHERE ts.id = ?
-        GROUP BY ts.id`,
-                [params.id],
-                (err, row) => {
-                    if (err) {
-                        console.error('テストスイート詳細取得エラー:', err);
-                        reject(err);
-                        return;
-                    }
+        // テストスイートの基本情報を取得
+        const testSuite = await db.get(
+            `SELECT 
+                ts.*,
+                COUNT(tc.id) as test_case_count
+            FROM test_suites ts
+            LEFT JOIN test_cases tc ON ts.id = tc.suite_id
+            WHERE ts.id = ?
+            GROUP BY ts.id`,
+            [params.id]
+        );
 
-                    if (!row) {
-                        resolve(
-                            NextResponse.json(
-                                { error: 'テストスイートが見つかりません' },
-                                { status: 404 }
-                            )
-                        );
-                        return;
-                    }
-
-                    // テストケース一覧を取得
-                    db.all(
-                        `SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at DESC`,
-                        [params.id],
-                        (err, testCases) => {
-                            if (err) {
-                                console.error('テストケース一覧取得エラー:', err);
-                                reject(err);
-                                return;
-                            }
-
-                            resolve(
-                                NextResponse.json({
-                                    ...row,
-                                    testCases: testCases || [],
-                                })
-                            );
-                        }
-                    );
-                }
+        if (!testSuite) {
+            return NextResponse.json(
+                { error: 'テストスイートが見つかりません' },
+                { status: 404 }
             );
+        }
+
+        // テストケース一覧を取得
+        const testCases = await db.all(
+            `SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at DESC`,
+            [params.id]
+        );
+
+        return NextResponse.json({
+            ...testSuite,
+            testCases: testCases || [],
         });
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
-            { error: 'テストスイートの取得に失敗しました' },
+            { error: error instanceof Error ? error.message : 'テストスイートの取得に失敗しました' },
             { status: 500 }
         );
     }
@@ -82,39 +69,32 @@ export async function PUT(
             );
         }
 
-        const db = await initializeDatabase();
+        const db = await Promise.race([
+            initializeDatabase(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+            )
+        ]) as Database<sqlite3.Database>;
 
-        return new Promise((resolve, reject) => {
-            db.run(
-                `UPDATE test_suites 
-        SET name = ?, description = ?, tags = ?, updated_at = CURRENT_TIMESTAMP 
-        WHERE id = ?`,
-                [name, description, tags, params.id],
-                function (err) {
-                    if (err) {
-                        console.error('テストスイート更新エラー:', err);
-                        reject(err);
-                        return;
-                    }
+        const result = await db.run(
+            `UPDATE test_suites 
+            SET name = ?, description = ?, tags = ?, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?`,
+            [name, description, tags, params.id]
+        );
 
-                    if (this.changes === 0) {
-                        resolve(
-                            NextResponse.json(
-                                { error: 'テストスイートが見つかりません' },
-                                { status: 404 }
-                            )
-                        );
-                        return;
-                    }
-
-                    resolve(NextResponse.json({ id: params.id }));
-                }
+        if (result.changes === 0) {
+            return NextResponse.json(
+                { error: 'テストスイートが見つかりません' },
+                { status: 404 }
             );
-        });
+        }
+
+        return NextResponse.json({ id: params.id });
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
-            { error: 'テストスイートの更新に失敗しました' },
+            { error: error instanceof Error ? error.message : 'テストスイートの更新に失敗しました' },
             { status: 500 }
         );
     }
@@ -126,77 +106,55 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        const db = await initializeDatabase();
+        const db = await Promise.race([
+            initializeDatabase(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+            )
+        ]) as Database<sqlite3.Database>;
 
-        return new Promise((resolve, reject) => {
-            // トランザクションを開始
-            db.serialize(() => {
-                db.run('BEGIN TRANSACTION');
+        await db.run('BEGIN TRANSACTION');
 
-                // 関連するテストケースのテストステップを削除
-                db.run(
-                    `DELETE FROM test_steps 
-          WHERE test_case_id IN (
-            SELECT id FROM test_cases WHERE suite_id = ?
-          )`,
-                    [params.id],
-                    (err) => {
-                        if (err) {
-                            console.error('テストステップ削除エラー:', err);
-                            db.run('ROLLBACK');
-                            reject(err);
-                            return;
-                        }
+        try {
+            // 関連するテストケースのテストステップを削除
+            await db.run(
+                `DELETE FROM test_steps 
+                WHERE case_id IN (
+                    SELECT id FROM test_cases WHERE suite_id = ?
+                )`,
+                [params.id]
+            );
 
-                        // 関連するテストケースを削除
-                        db.run(
-                            'DELETE FROM test_cases WHERE suite_id = ?',
-                            [params.id],
-                            (err) => {
-                                if (err) {
-                                    console.error('テストケース削除エラー:', err);
-                                    db.run('ROLLBACK');
-                                    reject(err);
-                                    return;
-                                }
+            // 関連するテストケースを削除
+            await db.run(
+                'DELETE FROM test_cases WHERE suite_id = ?',
+                [params.id]
+            );
 
-                                // テストスイートを削除
-                                db.run(
-                                    'DELETE FROM test_suites WHERE id = ?',
-                                    [params.id],
-                                    function (err) {
-                                        if (err) {
-                                            console.error('テストスイート削除エラー:', err);
-                                            db.run('ROLLBACK');
-                                            reject(err);
-                                            return;
-                                        }
+            // テストスイートを削除
+            const result = await db.run(
+                'DELETE FROM test_suites WHERE id = ?',
+                [params.id]
+            );
 
-                                        if (this.changes === 0) {
-                                            db.run('ROLLBACK');
-                                            resolve(
-                                                NextResponse.json(
-                                                    { error: 'テストスイートが見つかりません' },
-                                                    { status: 404 }
-                                                )
-                                            );
-                                            return;
-                                        }
-
-                                        db.run('COMMIT');
-                                        resolve(NextResponse.json({ success: true }));
-                                    }
-                                );
-                            }
-                        );
-                    }
+            if (result.changes === 0) {
+                await db.run('ROLLBACK');
+                return NextResponse.json(
+                    { error: 'テストスイートが見つかりません' },
+                    { status: 404 }
                 );
-            });
-        });
+            }
+
+            await db.run('COMMIT');
+            return NextResponse.json({ success: true });
+        } catch (error) {
+            await db.run('ROLLBACK');
+            throw error;
+        }
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
-            { error: 'テストスイートの削除に失敗しました' },
+            { error: error instanceof Error ? error.message : 'テストスイートの削除に失敗しました' },
             { status: 500 }
         );
     }
