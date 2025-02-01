@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/Form";
 import { Input } from "@/components/ui/Input";
-import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import TestStepEditor from "@/components/test-steps/TestStepEditor";
 
 const testStepSchema = z.object({
   action: z.string().min(1, "必須項目です"),
@@ -73,11 +73,6 @@ export default function EditTestCasePage() {
           after_each: testCase.after_each || [],
         }
       : undefined,
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "steps",
   });
 
   const mutation = useMutation({
@@ -165,94 +160,7 @@ export default function EditTestCasePage() {
               )}
             />
 
-            <div>
-              <div className="flex items-center justify-between">
-                <FormLabel>テストステップ</FormLabel>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    append({
-                      action: "",
-                      xpath: "",
-                      args: null,
-                      description: null,
-                    })
-                  }
-                >
-                  <PlusIcon className="h-4 w-4 mr-2" />
-                  ステップを追加
-                </Button>
-              </div>
-              <div className="mt-4 space-y-4">
-                {fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="flex gap-4 items-start border rounded-lg p-4"
-                  >
-                    <div className="flex-1 space-y-4">
-                      <FormField
-                        control={form.control}
-                        name={`steps.${index}.action`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>アクション</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="click, type, waitForなど"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`steps.${index}.xpath`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>XPath</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="要素を特定するXPathを入力"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`steps.${index}.description`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>説明</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="ステップの説明を入力"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => remove(index)}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <TestStepEditor />
 
             <FormField
               control={form.control}
