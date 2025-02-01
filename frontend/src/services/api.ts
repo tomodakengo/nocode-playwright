@@ -17,12 +17,12 @@ const api = axios.create({
 
 // Projects
 export const getProjects = async () => {
-    const response = await api.get<Project[]>('/api/projects');
+    const response = await api.get<Project[]>('/projects/');
     return response.data;
 };
 
 export const getProject = async (id: number) => {
-    const response = await api.get<Project>(`/api/projects/${id}`);
+    const response = await api.get<Project>(`/projects/${id}/`);
     return response.data;
 };
 
@@ -30,17 +30,17 @@ export const createProject = async (data: {
     name: string;
     description: string;
 }) => {
-    const response = await api.post<Project>('/api/projects', data);
+    const response = await api.post<Project>('/projects/', data);
     return response.data;
 };
 
 export const updateProject = async (id: number, data: { name: string; description: string }) => {
-    const response = await api.put<Project>(`/api/projects/${id}`, data);
+    const response = await api.put<Project>(`/projects/${id}/`, data);
     return response.data;
 };
 
 export const deleteProject = async (id: number) => {
-    await api.delete(`/api/projects/${id}`);
+    await api.delete(`/projects/${id}/`);
 };
 
 // Test Suites
