@@ -118,4 +118,86 @@ export async function PUT(
             { status: 500 }
         );
     }
+}
+
+// テストスイートの削除
+export async function DELETE(
+    request: Request,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const db = await initializeDatabase();
+
+        return new Promise((resolve, reject) => {
+            // トランザクションを開始
+            db.serialize(() => {
+                db.run('BEGIN TRANSACTION');
+
+                // 関連するテストケースのテストステップを削除
+                db.run(
+                    `DELETE FROM test_steps 
+          WHERE test_case_id IN (
+            SELECT id FROM test_cases WHERE suite_id = ?
+          )`,
+                    [params.id],
+                    (err) => {
+                        if (err) {
+                            console.error('テストステップ削除エラー:', err);
+                            db.run('ROLLBACK');
+                            reject(err);
+                            return;
+                        }
+
+                        // 関連するテストケースを削除
+                        db.run(
+                            'DELETE FROM test_cases WHERE suite_id = ?',
+                            [params.id],
+                            (err) => {
+                                if (err) {
+                                    console.error('テストケース削除エラー:', err);
+                                    db.run('ROLLBACK');
+                                    reject(err);
+                                    return;
+                                }
+
+                                // テストスイートを削除
+                                db.run(
+                                    'DELETE FROM test_suites WHERE id = ?',
+                                    [params.id],
+                                    function (err) {
+                                        if (err) {
+                                            console.error('テストスイート削除エラー:', err);
+                                            db.run('ROLLBACK');
+                                            reject(err);
+                                            return;
+                                        }
+
+                                        if (this.changes === 0) {
+                                            db.run('ROLLBACK');
+                                            resolve(
+                                                NextResponse.json(
+                                                    { error: 'テストスイートが見つかりません' },
+                                                    { status: 404 }
+                                                )
+                                            );
+                                            return;
+                                        }
+
+                                        db.run('COMMIT');
+                                        resolve(NextResponse.json({ success: true }));
+                                    }
+                                );
+                            }
+                        );
+                    }
+                );
+            });
+        });
+    } catch (error) {
+        console.error('データベース操作エラー:', error);
+        return NextResponse.json(
+            { error: 'テストスイートの削除に失敗しました' },
+            { status: 500 }
+        );
+    }
 } 

@@ -35,6 +35,8 @@ export default function TestSuiteDetail({
   const [testSuite, setTestSuite] = useState<TestSuiteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchTestSuite = async () => {
@@ -57,6 +59,31 @@ export default function TestSuiteDetail({
 
     fetchTestSuite();
   }, [params.id]);
+
+  const handleDelete = async () => {
+    if (!testSuite) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/test-suites/${params.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "テストスイートの削除に失敗しました");
+      }
+
+      router.push("/test-suites");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "予期せぬエラーが発生しました"
+      );
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -115,8 +142,45 @@ export default function TestSuiteDetail({
           >
             テストケース追加
           </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            削除
+          </button>
         </div>
       </div>
+
+      {/* 削除確認モーダル */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 max-w-sm mx-auto">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              テストスイートの削除
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              このテストスイートを削除すると、関連するすべてのテストケースとテストステップも削除されます。
+              この操作は取り消せません。
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={deleting}
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={deleting}
+              >
+                {deleting ? "削除中..." : "削除"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* テストスイート情報 */}
       <div className="bg-white shadow rounded-lg">
