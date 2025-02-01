@@ -40,7 +40,7 @@ export async function POST(
 
         // 現在の最大order_indexを取得
         const orderResult = await db.get(
-            'SELECT MAX(order_index) as max_order FROM test_steps WHERE case_id = ?',
+            'SELECT MAX(order_index) as max_order FROM test_steps WHERE test_case_id = ?',
             [params.testCaseId]
         );
 
@@ -49,7 +49,7 @@ export async function POST(
         // テストステップの作成
         const result = await db.run(
             `INSERT INTO test_steps (
-                case_id,
+                test_case_id,
                 name,
                 description,
                 action,
@@ -90,7 +90,7 @@ export async function GET(
         ]) as Database<sqlite3.Database>;
 
         const steps = await db.all(
-            'SELECT * FROM test_steps WHERE case_id = ? ORDER BY order_index ASC',
+            'SELECT * FROM test_steps WHERE test_case_id = ? ORDER BY order_index ASC',
             [params.testCaseId]
         );
 

@@ -127,9 +127,9 @@ export async function DELETE(
                 );
             }
 
-            // 関連するテストステップの削除
+            // 関連するテストステップを削除
             await db.run(
-                'DELETE FROM test_steps WHERE case_id = ?',
+                'DELETE FROM test_steps WHERE test_case_id = ?',
                 [params.testCaseId]
             );
 

@@ -16,7 +16,7 @@ export async function GET(
         ]) as Database<sqlite3.Database>;
 
         const step = await db.get(
-            `SELECT * FROM test_steps WHERE id = ? AND case_id = ?`,
+            `SELECT * FROM test_steps WHERE id = ? AND test_case_id = ?`,
             [params.stepId, params.testCaseId]
         );
 
@@ -64,7 +64,7 @@ export async function PUT(
 
         // テストステップの存在確認
         const existingStep = await db.get(
-            "SELECT id FROM test_steps WHERE id = ? AND case_id = ?",
+            "SELECT id FROM test_steps WHERE id = ? AND test_case_id = ?",
             [params.stepId, params.testCaseId]
         );
 
@@ -79,7 +79,7 @@ export async function PUT(
         await db.run(
             `UPDATE test_steps 
        SET name = ?, description = ?, action = ?, expected_result = ?
-       WHERE id = ? AND case_id = ?`,
+       WHERE id = ? AND test_case_id = ?`,
             [name, description, action, expected_result, params.stepId, params.testCaseId]
         );
 
