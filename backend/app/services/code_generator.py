@@ -6,6 +6,16 @@ from sqlalchemy.orm import Session
 from app.services.test_suite import TestSuiteService
 from app.services.test_case import TestCaseService
 from app.services.page import PageService
+from app.models.code_generator import GeneratedCode, CodeType
+from app.models.page import Page
+from app.models.test_case import TestCase
+from app.schemas.code_generator import (
+    CodeGeneratorCreate,
+    CodeGeneratorUpdate,
+    PageObjectTemplate,
+    TestCaseTemplate,
+    ConfigTemplate,
+)
 
 class PlaywrightCodeGenerator:
     def __init__(self, db: Session):
@@ -231,3 +241,200 @@ export default config;
 
         for directory in directories:
             os.makedirs(os.path.join(base_dir, directory), exist_ok=True)
+
+def get_generated_code(db: Session, code_id: int):
+    return db.query(GeneratedCode).filter(GeneratedCode.id == code_id).first()
+
+def get_generated_code_list(db: Session, project_id: int, skip: int = 0, limit: int = 100):
+    return (
+        db.query(GeneratedCode)
+        .filter(GeneratedCode.project_id == project_id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+def create_generated_code(db: Session, code: CodeGeneratorCreate, content: str):
+    db_code = GeneratedCode(**code.model_dump(), content=content)
+    db.add(db_code)
+    db.commit()
+    db.refresh(db_code)
+    return db_code
+
+def update_generated_code(db: Session, code_id: int, code: CodeGeneratorUpdate):
+    db_code = get_generated_code(db, code_id)
+    if db_code:
+        update_data = code.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(db_code, key, value)
+        db.commit()
+        db.refresh(db_code)
+    return db_code
+
+def delete_generated_code(db: Session, code_id: int):
+    db_code = get_generated_code(db, code_id)
+    if db_code:
+        db.delete(db_code)
+        db.commit()
+    return db_code
+
+def generate_page_object(db: Session, page_id: int, project_id: int) -> Optional[str]:
+    """Page Objectクラスのコードを生成します"""
+    page = db.query(Page).filter(Page.id == page_id).first()
+    if not page:
+        return None
+
+    template = PageObjectTemplate(
+        class_name=f"{page.name.title().replace(' ', '')}Page",
+        url_pattern=page.url_pattern,
+        selectors=page.selectors,
+        wait_conditions=page.wait_conditions,
+        iframe_selector=page.iframe_selector
+    )
+
+    # テンプレートからコードを生成
+    code = f"""import { Page } from '@playwright/test';
+
+export class {template.class_name} {{
+    private page: Page;
+
+    constructor(page: Page) {{
+        this.page = page;
+    }}
+
+    // URL pattern for this page
+    static readonly URL_PATTERN = '{template.url_pattern}';
+
+    // Selectors
+"""
+
+    # セレクタの定義を追加
+    for name, selector in template.selectors.items():
+        code += f"    private readonly {name}Selector = '{selector['xpath']}';\n"
+
+    # メソッドを生成
+    for name, selector in template.selectors.items():
+        method_name = name.lower()
+        code += f"""
+    async get{name.title()}() {{
+        return this.page.locator(this.{name}Selector);
+    }}
+"""
+
+    # iframeがある場合の処理を追加
+    if template.iframe_selector:
+        code += f"""
+    private async switchToFrame() {{
+        const frame = this.page.frameLocator('{template.iframe_selector}');
+        return frame;
+    }}
+"""
+
+    code += "}\n"
+    return code
+
+def generate_test_case(db: Session, test_case_id: int, project_id: int) -> Optional[str]:
+    """テストケースのコードを生成します"""
+    test_case = db.query(TestCase).filter(TestCase.id == test_case_id).first()
+    if not test_case:
+        return None
+
+    template = TestCaseTemplate(
+        class_name=f"{test_case.name.title().replace(' ', '')}Test",
+        description=test_case.description,
+        test_data=test_case.test_data[0].data if test_case.test_data else None,
+        before_each=test_case.before_each,
+        after_each=test_case.after_each,
+        steps=test_case.steps,
+        expected_results=test_case.expected_results
+    )
+
+    # テンプレートからコードを生成
+    code = f"""import {{ test, expect }} from '@playwright/test';
+import {{ {template.class_name}Page }} from '../pages/{template.class_name.lower()}.page';
+
+test.describe('{template.description or template.class_name}', () => {{
+"""
+
+    # beforeEachの生成
+    if template.before_each:
+        code += """
+    test.beforeEach(async ({ page }) => {
+"""
+        for step in template.before_each:
+            code += f"        // {step['description']}\n" if 'description' in step else ""
+            code += f"        await page.{step['action']}('{step['xpath']}'{', ' + str(step['args']) if 'args' in step else ''});\n"
+        code += "    });\n"
+
+    # テストケースの生成
+    code += f"""
+    test('should complete the test scenario', async ({{ page }}) => {{
+"""
+
+    # テストデータがある場合
+    if template.test_data:
+        code += f"        const testData = {template.test_data};\n"
+
+    # テストステップの生成
+    for step in template.steps:
+        code += f"        // {step['description']}\n" if 'description' in step else ""
+        code += f"        await page.{step['action']}('{step['xpath']}'{', ' + str(step['args']) if 'args' in step else ''});\n"
+
+    # 期待結果の検証
+    if template.expected_results:
+        for result in template.expected_results:
+            code += f"        await expect(page.locator('{result['selector']}')).{result['comparison_type']}({result['expected_value']});\n"
+
+    code += "    });\n});\n"
+    return code
+
+def generate_config(db: Session, project_id: int) -> Optional[str]:
+    """Playwrightの設定ファイルを生成します"""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        return None
+
+    template = ConfigTemplate(
+        project_name=project.name,
+        browser_type="chromium",  # デフォルト値
+        viewport={"width": 1280, "height": 720},
+        timeout=30000,
+        screenshot_dir="./screenshots",
+        video_dir="./videos",
+        retry_count=2
+    )
+
+    # テンプレートからコードを生成
+    code = f"""import {{ PlaywrightTestConfig }} from '@playwright/test';
+
+const config: PlaywrightTestConfig = {{
+    testDir: './tests',
+    timeout: {template.timeout},
+    retries: {template.retry_count},
+    use: {{
+        baseURL: '{template.base_url or ""}',
+        viewport: {{ width: {template.viewport['width']}, height: {template.viewport['height']} }},
+        screenshot: 'only-on-failure',
+        video: 'retain-on-failure',
+    }},
+    projects: [
+        {{
+            name: '{template.browser_type}',
+            use: {{
+                browserName: '{template.browser_type}',
+            }},
+        }},
+    ],
+    reporter: [
+        ['html', {{ outputFolder: './playwright-report' }}],
+        ['json', {{ outputFile: './playwright-report/test-results.json' }}]
+    ],
+    outputDir: './test-results',
+    preserveOutput: 'failures-only',
+    globalSetup: require.resolve('./global-setup'),
+    globalTeardown: require.resolve('./global-teardown'),
+}};
+
+export default config;
+"""
+    return code
