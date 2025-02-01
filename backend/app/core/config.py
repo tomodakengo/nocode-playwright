@@ -1,23 +1,27 @@
 from pydantic_settings import BaseSettings
-from functools import lru_cache
+from typing import Any, Dict, Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "NoCode Playwright"
-    VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
     
-    # CORS設定
-    BACKEND_CORS_ORIGINS: list[str] = [
-        "http://localhost:3000",  # React frontend
-        "http://localhost:8000",  # FastAPI backend
-    ]
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "nocode_playwright"
+    SQLALCHEMY_DATABASE_URI: Optional[str] = None
     
-    # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/nocode_playwright"
+    DB_ECHO: bool = False
     
     class Config:
         case_sensitive = True
+        
+    def __init__(self, **values: Any):
+        super().__init__(**values)
+        if not self.SQLALCHEMY_DATABASE_URI:
+            self.SQLALCHEMY_DATABASE_URI = (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
+            )
 
-@lru_cache()
-def get_settings() -> Settings:
-    return Settings()
+settings = Settings()

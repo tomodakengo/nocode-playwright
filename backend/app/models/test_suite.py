@@ -1,12 +1,16 @@
-from sqlalchemy import Column, String, Text, JSON
-from app.models.base import BaseModel
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
-class TestSuite(BaseModel):
+from app.core.database import Base
+
+class TestSuite(Base):
     __tablename__ = "test_suites"
-
-    name = Column(String, index=True, nullable=False)
-    description = Column(Text, nullable=True)
-    configuration = Column(JSON, nullable=False, default=dict)
     
-    def __repr__(self):
-        return f"<TestSuite {self.name}>"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    test_cases = relationship("TestCase", back_populates="test_suite", cascade="all, delete-orphan")
