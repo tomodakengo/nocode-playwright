@@ -2,6 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import { Fragment } from "react";
+import TestStepList from "@/components/TestStepList";
+import TestStepForm from "@/components/TestStepForm";
 
 interface TestCase {
   id: number;
@@ -17,14 +21,11 @@ interface TestCase {
 
 interface TestStep {
   id: number;
-  case_id: number;
-  name: string;
-  description: string;
-  action: string;
-  expected_result: string;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
+  action_type: string;
+  selector_name: string | null;
+  input_value: string | null;
+  assertion_value: string | null;
+  description: string | null;
 }
 
 export default function TestCaseDetail({
@@ -34,11 +35,12 @@ export default function TestCaseDetail({
 }) {
   const router = useRouter();
   const [testCase, setTestCase] = useState<TestCase | null>(null);
-  const [testSteps, setTestSteps] = useState<TestStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isStepFormOpen, setIsStepFormOpen] = useState(false);
+  const [selectedStep, setSelectedStep] = useState<TestStep | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,19 +57,6 @@ export default function TestCaseDetail({
 
         const caseData = await caseResponse.json();
         setTestCase(caseData);
-
-        // テストステップの取得
-        const stepsResponse = await fetch(
-          `/api/test-suites/${params.id}/test-cases/${params.testCaseId}/steps`
-        );
-
-        if (!stepsResponse.ok) {
-          const data = await stepsResponse.json();
-          throw new Error(data.error || "テストステップの取得に失敗しました");
-        }
-
-        const stepsData = await stepsResponse.json();
-        setTestSteps(stepsData);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "予期せぬエラーが発生しました"
@@ -106,6 +95,16 @@ export default function TestCaseDetail({
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleStepSelect = (step: TestStep) => {
+    setSelectedStep(step);
+    setIsStepFormOpen(true);
+  };
+
+  const handleStepFormSuccess = () => {
+    setIsStepFormOpen(false);
+    setSelectedStep(null);
   };
 
   if (loading) {
@@ -242,74 +241,17 @@ export default function TestCaseDetail({
               テストステップ
             </h2>
             <button
-              onClick={() =>
-                router.push(
-                  `/test-suites/${params.id}/test-cases/${params.testCaseId}/steps/new`
-                )
-              }
+              onClick={() => setIsStepFormOpen(true)}
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               ステップを追加
             </button>
           </div>
 
-          {testSteps.length === 0 ? (
-            <p className="text-gray-500">テストステップはまだありません</p>
-          ) : (
-            <div className="space-y-4">
-              {testSteps.map((step) => (
-                <div
-                  key={step.id}
-                  className="border rounded-lg p-4 hover:bg-gray-50"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">
-                        {step.order_index}. {step.name}
-                      </h3>
-                      {step.description && (
-                        <p className="mt-1 text-sm text-gray-500">
-                          {step.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/test-suites/${params.id}/test-cases/${params.testCaseId}/steps/${step.id}/edit`
-                          )
-                        }
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        編集
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    <div>
-                      <h4 className="text-xs font-medium text-gray-500">
-                        アクション
-                      </h4>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {step.action}
-                      </p>
-                    </div>
-                    {step.expected_result && (
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-500">
-                          期待結果
-                        </h4>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {step.expected_result}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <TestStepList
+            testCaseId={params.testCaseId}
+            onStepSelect={handleStepSelect}
+          />
         </div>
       </div>
 
@@ -344,6 +286,61 @@ export default function TestCaseDetail({
           </div>
         </div>
       )}
+
+      {/* テストステップフォームモーダル */}
+      <Transition appear show={isStepFormOpen} as={Fragment}>
+        <Dialog
+          as="div"
+          className="fixed inset-0 z-10 overflow-y-auto"
+          onClose={() => setIsStepFormOpen(false)}
+        >
+          <div className="min-h-screen px-4 text-center">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+            </Transition.Child>
+
+            <span
+              className="inline-block h-screen align-middle"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+                <Dialog.Title
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-gray-900 mb-4"
+                >
+                  {selectedStep ? "テストステップの編集" : "新規テストステップ"}
+                </Dialog.Title>
+
+                <TestStepForm
+                  testCaseId={params.testCaseId}
+                  stepId={selectedStep?.id}
+                  onSuccess={handleStepFormSuccess}
+                  onCancel={() => setIsStepFormOpen(false)}
+                />
+              </div>
+            </Transition.Child>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 }
