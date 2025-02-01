@@ -4,7 +4,13 @@ import { initializeDatabase } from '@/lib/db/init';
 // テストスイート一覧の取得
 export async function GET() {
     try {
-        const db = await initializeDatabase();
+        const db = await Promise.race([
+            initializeDatabase(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+            )
+        ]);
+
         const rows = await db.all(`
             SELECT 
                 ts.*,
@@ -18,7 +24,7 @@ export async function GET() {
     } catch (error) {
         console.error('データベース取得エラー:', error);
         return NextResponse.json(
-            { error: 'テストスイートの取得に失敗しました' },
+            { error: error instanceof Error ? error.message : 'テストスイートの取得に失敗しました' },
             { status: 500 }
         );
     }
@@ -36,7 +42,13 @@ export async function POST(request: Request) {
             );
         }
 
-        const db = await initializeDatabase();
+        const db = await Promise.race([
+            initializeDatabase(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+            )
+        ]);
+
         const result = await db.run(
             `INSERT INTO test_suites (name, description, tags) VALUES (?, ?, ?)`,
             [name, description, tags]
