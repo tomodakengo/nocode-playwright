@@ -37,7 +37,7 @@ export function useTestSuites() {
         name: string;
         description?: string;
         tags?: string;
-    }) => {
+    }): Promise<{ success: boolean; error?: string; id?: number }> => {
         try {
             const response = await fetch('/api/test-suites', {
                 method: 'POST',
@@ -47,16 +47,25 @@ export function useTestSuites() {
                 body: JSON.stringify(data),
             });
 
+            const responseData = await response.json();
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'テストスイートの作成に失敗しました');
+                return {
+                    success: false,
+                    error: responseData.error || 'テストスイートの作成に失敗しました'
+                };
             }
 
             await fetchTestSuites(); // 一覧を再取得
-            return true;
+            return {
+                success: true,
+                id: responseData.id
+            };
         } catch (err) {
-            setError(err instanceof Error ? err.message : '予期せぬエラーが発生しました');
-            return false;
+            return {
+                success: false,
+                error: err instanceof Error ? err.message : '予期せぬエラーが発生しました'
+            };
         }
     };
 

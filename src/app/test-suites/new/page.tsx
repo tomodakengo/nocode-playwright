@@ -22,11 +22,10 @@ export default function NewTestSuite() {
 
     try {
       const result = await createTestSuite(formData);
-      if (result.success) {
-        router.push("/test-suites");
-        router.refresh();
-      } else if (result.error) {
-        setError(result.error);
+      if (result.success && result.id) {
+        router.push(`/test-suites/${result.id}`);
+      } else {
+        setError(result.error || "テストスイートの作成に失敗しました");
       }
     } catch (err) {
       setError(
@@ -73,67 +72,63 @@ export default function NewTestSuite() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow">
+      <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg">
         <div className="p-6 space-y-6">
-          <div className="space-y-4">
-            {/* 名前 */}
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                名前
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="テストスイート名を入力"
-                required
-              />
-            </div>
+          {/* 名前 */}
+          <div>
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
+            >
+              名前
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <input
+              type="text"
+              name="name"
+              id="name"
+              required
+              value={formData.name}
+              onChange={handleChange}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+          </div>
 
-            {/* 説明 */}
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-gray-700"
-              >
-                説明
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={3}
-                className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="テストスイートの説明を入力"
-              />
-            </div>
+          {/* 説明 */}
+          <div>
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-gray-700"
+            >
+              説明
+            </label>
+            <textarea
+              name="description"
+              id="description"
+              rows={3}
+              value={formData.description}
+              onChange={handleChange}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+          </div>
 
-            {/* タグ */}
-            <div>
-              <label
-                htmlFor="tags"
-                className="block text-sm font-medium text-gray-700"
-              >
-                タグ
-              </label>
-              <input
-                type="text"
-                id="tags"
-                name="tags"
-                value={formData.tags}
-                onChange={handleChange}
-                className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="カンマ区切りでタグを入力（例: smoke,regression）"
-              />
-            </div>
+          {/* タグ */}
+          <div>
+            <label
+              htmlFor="tags"
+              className="block text-sm font-medium text-gray-700"
+            >
+              タグ
+            </label>
+            <input
+              type="text"
+              name="tags"
+              id="tags"
+              value={formData.tags}
+              onChange={handleChange}
+              placeholder="カンマ区切りで入力"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
           </div>
 
           {/* ボタン */}
