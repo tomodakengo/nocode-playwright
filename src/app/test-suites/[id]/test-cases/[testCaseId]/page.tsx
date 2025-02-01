@@ -15,6 +15,18 @@ interface TestCase {
   updated_at: string;
 }
 
+interface TestStep {
+  id: number;
+  case_id: number;
+  name: string;
+  description: string;
+  action: string;
+  expected_result: string;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function TestCaseDetail({
   params,
 }: {
@@ -22,25 +34,40 @@ export default function TestCaseDetail({
 }) {
   const router = useRouter();
   const [testCase, setTestCase] = useState<TestCase | null>(null);
+  const [testSteps, setTestSteps] = useState<TestStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const fetchTestCase = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(
+        // テストケースの取得
+        const caseResponse = await fetch(
           `/api/test-suites/${params.id}/test-cases/${params.testCaseId}`
         );
 
-        if (!response.ok) {
-          const data = await response.json();
+        if (!caseResponse.ok) {
+          const data = await caseResponse.json();
           throw new Error(data.error || "テストケースの取得に失敗しました");
         }
 
-        const data = await response.json();
-        setTestCase(data);
+        const caseData = await caseResponse.json();
+        setTestCase(caseData);
+
+        // テストステップの取得
+        const stepsResponse = await fetch(
+          `/api/test-suites/${params.id}/test-cases/${params.testCaseId}/steps`
+        );
+
+        if (!stepsResponse.ok) {
+          const data = await stepsResponse.json();
+          throw new Error(data.error || "テストステップの取得に失敗しました");
+        }
+
+        const stepsData = await stepsResponse.json();
+        setTestSteps(stepsData);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "予期せぬエラーが発生しました"
@@ -50,7 +77,7 @@ export default function TestCaseDetail({
       }
     };
 
-    fetchTestCase();
+    fetchData();
   }, [params.id, params.testCaseId]);
 
   const handleDelete = async () => {
@@ -204,6 +231,85 @@ export default function TestCaseDetail({
               </div>
             </dl>
           </div>
+        </div>
+      </div>
+
+      {/* テストステップ一覧 */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="p-6 space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-medium text-gray-900">
+              テストステップ
+            </h2>
+            <button
+              onClick={() =>
+                router.push(
+                  `/test-suites/${params.id}/test-cases/${params.testCaseId}/steps/new`
+                )
+              }
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              ステップを追加
+            </button>
+          </div>
+
+          {testSteps.length === 0 ? (
+            <p className="text-gray-500">テストステップはまだありません</p>
+          ) : (
+            <div className="space-y-4">
+              {testSteps.map((step) => (
+                <div
+                  key={step.id}
+                  className="border rounded-lg p-4 hover:bg-gray-50"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">
+                        {step.order_index}. {step.name}
+                      </h3>
+                      {step.description && (
+                        <p className="mt-1 text-sm text-gray-500">
+                          {step.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/test-suites/${params.id}/test-cases/${params.testCaseId}/steps/${step.id}/edit`
+                          )
+                        }
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        編集
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-500">
+                        アクション
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {step.action}
+                      </p>
+                    </div>
+                    {step.expected_result && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-500">
+                          期待結果
+                        </h4>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {step.expected_result}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
