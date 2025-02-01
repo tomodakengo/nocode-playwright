@@ -19,8 +19,8 @@ interface Selector {
 }
 
 interface FormData {
-  action_type_id: number;
-  selector_id: number | null;
+  action_type_id: string;
+  selector_id: string | null;
   input_value: string;
   assertion_value: string;
   description: string;
@@ -40,7 +40,7 @@ export default function TestStepForm({
   onCancel,
 }: TestStepFormProps) {
   const [formData, setFormData] = useState<FormData>({
-    action_type_id: 0,
+    action_type_id: "",
     selector_id: null,
     input_value: "",
     assertion_value: "",
@@ -76,22 +76,24 @@ export default function TestStepForm({
         // 編集時は既存のデータを取得
         if (stepId) {
           const stepResponse = await fetch(
-            `/api/test-cases/${testCaseId}/steps/${stepId}`
+            `/api/test-suites/${testCaseId.split("/")[0]}/test-cases/${
+              testCaseId.split("/")[1]
+            }/steps/${stepId}`
           );
           if (!stepResponse.ok) {
             throw new Error("テストステップの取得に失敗しました");
           }
           const stepData = await stepResponse.json();
           setFormData({
-            action_type_id: stepData.action_type_id,
-            selector_id: stepData.selector_id,
+            action_type_id: stepData.action_type_id.toString(),
+            selector_id: stepData.selector_id?.toString() || null,
             input_value: stepData.input_value || "",
             assertion_value: stepData.assertion_value || "",
             description: stepData.description || "",
           });
           setSelectedActionType(
             actionTypesData.find(
-              (at: ActionType) => at.id === stepData.action_type_id
+              (at: ActionType) => at.id === Number(stepData.action_type_id)
             )
           );
         }
@@ -118,13 +120,13 @@ export default function TestStepForm({
       setSelectedActionType(actionType || null);
       setFormData((prev) => ({
         ...prev,
-        [name]: Number(value),
+        [name]: value,
         selector_id: actionType?.has_selector ? prev.selector_id : null,
       }));
     } else {
       setFormData((prev) => ({
         ...prev,
-        [name]: name === "selector_id" ? Number(value) : value,
+        [name]: value,
       }));
     }
   };
@@ -135,10 +137,18 @@ export default function TestStepForm({
     setError(null);
 
     try {
+      const [suiteId, caseId] = testCaseId.split("/");
       const url = stepId
-        ? `/api/test-cases/${testCaseId}/steps/${stepId}`
-        : `/api/test-cases/${testCaseId}/steps`;
+        ? `/api/test-suites/${suiteId}/test-cases/${caseId}/steps/${stepId}`
+        : `/api/test-suites/${suiteId}/test-cases/${caseId}/steps`;
       const method = stepId ? "PUT" : "POST";
+
+      const selectedAction = actionTypes.find(
+        (at) => at.id === Number(formData.action_type_id)
+      );
+      if (!selectedAction) {
+        throw new Error("アクションタイプを選択してください");
+      }
 
       const response = await fetch(url, {
         method,
@@ -146,18 +156,20 @@ export default function TestStepForm({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action_type_id: formData.action_type_id,
-          selector_id: selectedActionType?.has_selector
-            ? formData.selector_id
-            : null,
-          input_value: selectedActionType?.has_value
-            ? formData.input_value
-            : null,
-          assertion_value: selectedActionType?.has_assertion
+          test_case_id: parseInt(caseId),
+          name: selectedAction.name,
+          action: selectedAction.name,
+          action_type_id: parseInt(formData.action_type_id),
+          selector_id:
+            selectedAction.has_selector && formData.selector_id
+              ? parseInt(formData.selector_id)
+              : null,
+          input_value: selectedAction.has_value ? formData.input_value : null,
+          assertion_value: selectedAction.has_assertion
             ? formData.assertion_value
             : null,
-          description: formData.description,
-          order_index: stepId ? undefined : 9999, // 新規作成時は最後に追加
+          description: formData.description || null,
+          order_index: stepId ? undefined : 9999,
         }),
       });
 
@@ -204,7 +216,7 @@ export default function TestStepForm({
         <select
           id="action_type_id"
           name="action_type_id"
-          value={formData.action_type_id || ""}
+          value={formData.action_type_id}
           onChange={handleChange}
           className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           required

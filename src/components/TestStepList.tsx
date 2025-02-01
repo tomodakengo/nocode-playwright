@@ -55,8 +55,9 @@ export default function TestStepList({
         setActionTypes(actionTypesData);
 
         // テストステップの取得
+        const [suiteId, caseId] = testCaseId.split("/");
         const stepsResponse = await fetch(
-          `/api/test-cases/${testCaseId}/steps`
+          `/api/test-suites/${suiteId}/test-cases/${caseId}/steps`
         );
         if (!stepsResponse.ok) {
           throw new Error("テストステップの取得に失敗しました");
@@ -91,18 +92,22 @@ export default function TestStepList({
     setSteps(updatedItems);
 
     try {
-      const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          updatedItems.map((item) => ({
-            id: item.id,
-            order_index: item.order_index,
-          }))
-        ),
-      });
+      const [suiteId, caseId] = testCaseId.split("/");
+      const response = await fetch(
+        `/api/test-suites/${suiteId}/test-cases/${caseId}/steps`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            updatedItems.map((item) => ({
+              id: item.id,
+              order_index: item.order_index,
+            }))
+          ),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("テストステップの順序の更新に失敗しました");
@@ -120,8 +125,9 @@ export default function TestStepList({
     }
 
     try {
+      const [suiteId, caseId] = testCaseId.split("/");
       const response = await fetch(
-        `/api/test-cases/${testCaseId}/steps/${stepId}`,
+        `/api/test-suites/${suiteId}/test-cases/${caseId}/steps/${stepId}`,
         {
           method: "DELETE",
         }

@@ -373,7 +373,7 @@ export default function TestCaseDetail({
                 </Dialog.Title>
 
                 <TestStepForm
-                  testCaseId={params.testCaseId}
+                  testCaseId={`${params.id}/${params.testCaseId}`}
                   stepId={selectedStep?.id}
                   onSuccess={handleStepFormSuccess}
                   onCancel={() => setIsStepFormOpen(false)}
