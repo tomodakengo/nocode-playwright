@@ -35,3 +35,6 @@ class Page(PageBase):
 
     class Config:
         from_attributes = True
+
+class PageResponse(Page):
+    pass
