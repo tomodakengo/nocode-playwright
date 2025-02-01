@@ -57,6 +57,48 @@ const initializeDatabase = async () => {
           );
         `);
 
+        await db.exec(`
+          CREATE TABLE IF NOT EXISTS pages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            url_pattern TEXT NOT NULL,
+            description TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(url_pattern)
+          );
+        `);
+
+        await db.exec(`
+          CREATE TABLE IF NOT EXISTS selectors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            page_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            selector_type TEXT NOT NULL CHECK(selector_type IN ('xpath', 'css', 'text', 'id', 'class')),
+            selector_value TEXT NOT NULL,
+            description TEXT,
+            is_dynamic BOOLEAN DEFAULT 0,
+            wait_condition TEXT CHECK(wait_condition IN ('visible', 'clickable', 'present', NULL)),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE,
+            UNIQUE(page_id, name)
+          );
+        `);
+
+        await db.exec(`
+          CREATE TABLE IF NOT EXISTS step_selectors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            step_id INTEGER NOT NULL,
+            selector_id INTEGER NOT NULL,
+            input_value TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (step_id) REFERENCES test_steps(id) ON DELETE CASCADE,
+            FOREIGN KEY (selector_id) REFERENCES selectors(id) ON DELETE CASCADE
+          );
+        `);
+
         return db;
       } catch (error) {
         console.error('データベース初期化エラー:', error);
