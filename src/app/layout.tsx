@@ -1,21 +1,16 @@
 "use client";
 
-import { Inter } from "next/font/google";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import Layout from "@/components/layout/Layout";
 import "./globals.css";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import Providers from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: false,
-    },
-  },
-});
+export const metadata: Metadata = {
+  title: "NoCode Playwright",
+  description: "NoCode Playwright Test Automation Tool",
+};
 
 export default function RootLayout({
   children,
@@ -25,10 +20,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={inter.className}>
-        <QueryClientProvider client={queryClient}>
-          <Layout>{children}</Layout>
-          <ReactQueryDevtools initialIsOpen={false} />
-        </QueryClientProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
