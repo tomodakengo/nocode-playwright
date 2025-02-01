@@ -204,7 +204,7 @@ export default function TestStepForm({
         <select
           id="action_type_id"
           name="action_type_id"
-          value={formData.action_type_id}
+          value={formData.action_type_id || ""}
           onChange={handleChange}
           className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           required
@@ -310,11 +310,11 @@ export default function TestStepForm({
           onChange={handleChange}
           rows={3}
           className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="ステップの説明を入力"
         />
       </div>
 
-      <div className="flex justify-end space-x-4 pt-4">
+      {/* ボタン */}
+      <div className="flex justify-end space-x-4">
         <button
           type="button"
           onClick={onCancel}
@@ -328,7 +328,7 @@ export default function TestStepForm({
           className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={submitting}
         >
-          {submitting ? "保存中..." : stepId ? "更新" : "作成"}
+          {submitting ? "保存中..." : "保存"}
         </button>
       </div>
     </form>
