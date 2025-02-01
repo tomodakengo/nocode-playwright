@@ -66,7 +66,7 @@ export default function TestStepForm({
         setActionTypes(actionTypesData);
 
         // セレクタの取得
-        const selectorsResponse = await fetch(`/api/pages/selectors`);
+        const selectorsResponse = await fetch(`/api/pages/1/selectors`);
         if (!selectorsResponse.ok) {
           throw new Error("セレクタの取得に失敗しました");
         }
@@ -146,7 +146,17 @@ export default function TestStepForm({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ...formData,
+          action_type_id: formData.action_type_id,
+          selector_id: selectedActionType?.has_selector
+            ? formData.selector_id
+            : null,
+          input_value: selectedActionType?.has_value
+            ? formData.input_value
+            : null,
+          assertion_value: selectedActionType?.has_assertion
+            ? formData.assertion_value
+            : null,
+          description: formData.description,
           order_index: stepId ? undefined : 9999, // 新規作成時は最後に追加
         }),
       });
