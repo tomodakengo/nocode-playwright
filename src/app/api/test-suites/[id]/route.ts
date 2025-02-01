@@ -119,7 +119,7 @@ export async function DELETE(
             // 関連するテストケースのテストステップを削除
             await db.run(
                 `DELETE FROM test_steps 
-                WHERE case_id IN (
+                WHERE test_case_id IN (
                     SELECT id FROM test_cases WHERE suite_id = ?
                 )`,
                 [params.id]

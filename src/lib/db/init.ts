@@ -45,7 +45,7 @@ const initializeDatabase = async () => {
         await db.exec(`
           CREATE TABLE IF NOT EXISTS test_steps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            case_id INTEGER NOT NULL,
+            test_case_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             description TEXT,
             action TEXT NOT NULL,
@@ -53,7 +53,7 @@ const initializeDatabase = async () => {
             order_index INTEGER NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (case_id) REFERENCES test_cases(id) ON DELETE CASCADE
+            FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE
           );
         `);
 
