@@ -5,11 +5,9 @@ GitHubリポジトリの設定
 Docker環境の構築
 CI/CD (GitHub Actions)の設定
 ## 技術スタックの選定
-バックエンド: FastAPI（高速、型安全、非同期対応）
-フロントエンド: React + TypeScript（コンポーネント指向、型安全）
+フロントエンド・バックエンド：NextJS
 データベース: PostgreSQL（オープンソース、JSON対応）
-ORM: SQLAlchemy
-テストツール: Pytest
+デザイン: TailwindCSS
 コンテナ管理: Docker Compose
 # フェーズ2: コアエンジンの実装
 ## Page Object Model生成エンジン
