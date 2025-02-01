@@ -3,58 +3,40 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
+from app.models.page import Page
+from app.schemas.page import Page as PageSchema
+from app.schemas.page import PageCreate, PageUpdate
 from app.services.page import PageService
-from app.schemas.page import (
-    PageCreate,
-    PageUpdate,
-    PageResponse
-)
 
 router = APIRouter(prefix="/pages", tags=["pages"])
+service = PageService()
 
-@router.post("/", response_model=PageResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=PageSchema, status_code=status.HTTP_201_CREATED)
 def create_page(page: PageCreate, db: Session = Depends(get_db)):
-    try:
-        service = PageService(db)
-        return service.create(page.model_dump())
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return service.create(db, page)
 
-@router.get("/", response_model=List[PageResponse])
+@router.get("/", response_model=List[PageSchema])
 def get_pages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    service = PageService(db)
-    return service.get_multi(skip=skip, limit=limit)
+    return service.get_multi(db, skip=skip, limit=limit)
 
-@router.get("/{page_id}", response_model=PageResponse)
+@router.get("/{page_id}", response_model=PageSchema)
 def get_page(page_id: int, db: Session = Depends(get_db)):
-    try:
-        service = PageService(db)
-        page = service.get(page_id)
-        if not page:
-            raise HTTPException(status_code=404, detail="Page not found")
-        return page
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    page = service.get(db, page_id)
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return page
 
-@router.put("/{page_id}", response_model=PageResponse)
-def update_page(
-    page_id: int,
-    page: PageUpdate,
-    db: Session = Depends(get_db)
-):
-    try:
-        service = PageService(db)
-        updated_page = service.update(page_id, page.model_dump(exclude_unset=True))
-        if not updated_page:
-            raise HTTPException(status_code=404, detail="Page not found")
-        return updated_page
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+@router.put("/{page_id}", response_model=PageSchema)
+def update_page(page_id: int, page: PageUpdate, db: Session = Depends(get_db)):
+    db_page = service.get(db, page_id)
+    if not db_page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return service.update(db, db_obj=db_page, obj_in=page)
 
 @router.delete("/{page_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_page(page_id: int, db: Session = Depends(get_db)):
-    try:
-        service = PageService(db)
-        service.delete(page_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    page = service.get(db, page_id)
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    service.delete(db, id=page_id)
+    return None

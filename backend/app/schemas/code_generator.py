@@ -1,24 +1,33 @@
-from typing import Optional, List, Dict
-from pydantic import BaseModel, Field
+from typing import Dict, List, Optional
+from pydantic import BaseModel
 
 class GeneratePageObjectRequest(BaseModel):
-    page_id: int = Field(..., description="ID of the page to generate code for")
-    output_dir: Optional[str] = Field(None, description="Optional output directory for the generated code")
+    name: str
+    url_pattern: str
+    selectors: List[Dict[str, str]]
 
 class GenerateTestFileRequest(BaseModel):
-    test_suite_id: int = Field(..., description="ID of the test suite to generate code for")
-    output_dir: Optional[str] = Field(None, description="Optional output directory for the generated code")
-
-class GenerateProjectRequest(BaseModel):
-    test_suite_ids: List[int] = Field(..., description="List of test suite IDs to include in the project")
-    output_dir: str = Field(..., description="Output directory for the generated project")
-    config: Dict = Field(default_factory=dict, description="Additional configuration for the project")
+    name: str
+    steps: List[Dict[str, str]]
 
 class GeneratedCodeResponse(BaseModel):
-    file_path: str = Field(..., description="Path to the generated file")
-    code_content: str = Field(..., description="Generated code content")
+    code: str
+    file_path: Optional[str] = None
 
-class GeneratedProjectResponse(BaseModel):
-    project_dir: str = Field(..., description="Path to the generated project directory")
-    generated_files: List[str] = Field(..., description="List of generated file paths")
-    config_files: List[str] = Field(..., description="List of configuration file paths")
+class TestStep(BaseModel):
+    action: str
+    selector: Optional[str] = None
+    value: Optional[str] = None
+    url: Optional[str] = None
+    description: Optional[str] = None
+    assertion: Optional[str] = None
+
+class TestCaseSchema(BaseModel):
+    name: str
+    description: Optional[str] = None
+    steps: List[TestStep]
+
+class TestSuiteSchema(BaseModel):
+    name: str
+    description: Optional[str] = None
+    test_cases: List[TestCaseSchema]
