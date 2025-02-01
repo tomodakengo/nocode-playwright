@@ -8,20 +8,10 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+      - sqlite_data:/app/prisma
     environment:
       - NODE_ENV=development
     command: npm run dev
 
-  db:
-    image: postgres:latest
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: nocode_playwright
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
 volumes:
-  postgres_data: 
+  sqlite_data: 
