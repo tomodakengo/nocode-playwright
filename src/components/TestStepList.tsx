@@ -34,7 +34,10 @@ interface TestStepListProps {
   onStepSelect?: (step: TestStep) => void;
 }
 
-const TestStepList = ({ testCaseId, onStepSelect }: TestStepListProps) => {
+export default function TestStepList({
+  testCaseId,
+  onStepSelect,
+}: TestStepListProps) {
   const [steps, setSteps] = useState<TestStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -237,6 +240,4 @@ const TestStepList = ({ testCaseId, onStepSelect }: TestStepListProps) => {
       )}
     </div>
   );
-};
-
-export default TestStepList;
+}

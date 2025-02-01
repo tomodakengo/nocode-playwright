@@ -33,12 +33,12 @@ interface TestStepFormProps {
   onCancel: () => void;
 }
 
-const TestStepForm = ({
+export default function TestStepForm({
   testCaseId,
   stepId,
   onSuccess,
   onCancel,
-}: TestStepFormProps) => {
+}: TestStepFormProps) {
   const [formData, setFormData] = useState<FormData>({
     action_type_id: 0,
     selector_id: null,
@@ -265,7 +265,7 @@ const TestStepForm = ({
         </div>
       ) : null}
 
-      {/* アサーション値 */}
+      {/* 検証値 */}
       {selectedActionType?.has_assertion ? (
         <div>
           <label
@@ -302,11 +302,9 @@ const TestStepForm = ({
           onChange={handleChange}
           rows={3}
           className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="ステップの説明を入力"
         />
       </div>
 
-      {/* ボタン */}
       <div className="flex justify-end space-x-4 pt-4">
         <button
           type="button"
@@ -326,6 +324,4 @@ const TestStepForm = ({
       </div>
     </form>
   );
-};
-
-export default TestStepForm;
+}
