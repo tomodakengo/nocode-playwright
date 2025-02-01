@@ -1,13 +1,16 @@
 "use client";
 
+import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import Layout from "@/components/layout/Layout";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const queryClient = new QueryClient();
+export const metadata: Metadata = {
+  title: "NoCode Playwright",
+  description: "NoCode Playwright Test Generator",
+};
 
 export default function RootLayout({
   children,
@@ -15,11 +18,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja">
-      <body className={inter.className}>
-        <QueryClientProvider client={queryClient}>
-          <Layout>{children}</Layout>
-        </QueryClientProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={cn(
+          "min-h-screen bg-background font-sans antialiased",
+          inter.className
+        )}
+      >
+        {children}
       </body>
     </html>
   );
