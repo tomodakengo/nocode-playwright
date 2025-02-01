@@ -1,40 +1,32 @@
 from sqlalchemy.orm import Session
 from app.models.test_suite import TestSuite
-from app.services.base import BaseService
-from typing import List, Optional
+from app.schemas.test_suite import TestSuiteCreate, TestSuiteUpdate
 
-class TestSuiteService(BaseService[TestSuite]):
-    def __init__(self, db: Session):
-        super().__init__(TestSuite, db)
+def get_test_suite(db: Session, test_suite_id: int):
+    return db.query(TestSuite).filter(TestSuite.id == test_suite_id).first()
 
-    def get_with_test_cases(self, id: int) -> Optional[TestSuite]:
-        """Get test suite with all its test cases"""
-        return (
-            self.db.query(TestSuite)
-            .filter(TestSuite.id == id)
-            .first()
-        )
+def get_test_suites(db: Session, project_id: int, skip: int = 0, limit: int = 100):
+    return db.query(TestSuite).filter(TestSuite.project_id == project_id).offset(skip).limit(limit).all()
 
-    def get_by_name(self, name: str) -> Optional[TestSuite]:
-        """Get test suite by name"""
-        return (
-            self.db.query(TestSuite)
-            .filter(TestSuite.name == name)
-            .first()
-        )
+def create_test_suite(db: Session, test_suite: TestSuiteCreate):
+    db_test_suite = TestSuite(**test_suite.model_dump())
+    db.add(db_test_suite)
+    db.commit()
+    db.refresh(db_test_suite)
+    return db_test_suite
 
-    def create(self, obj_in: dict) -> TestSuite:
-        """Create new test suite with validation"""
-        # Check if test suite with same name exists
-        existing = self.get_by_name(obj_in["name"])
-        if existing:
-            raise ValueError(f"Test suite with name '{obj_in['name']}' already exists")
-        return super().create(obj_in)
+def update_test_suite(db: Session, test_suite_id: int, test_suite: TestSuiteUpdate):
+    db_test_suite = get_test_suite(db, test_suite_id)
+    if db_test_suite:
+        for key, value in test_suite.model_dump(exclude_unset=True).items():
+            setattr(db_test_suite, key, value)
+        db.commit()
+        db.refresh(db_test_suite)
+    return db_test_suite
 
-    def update(self, id: int, obj_in: dict) -> TestSuite:
-        """Update test suite with validation"""
-        if "name" in obj_in:
-            existing = self.get_by_name(obj_in["name"])
-            if existing and existing.id != id:
-                raise ValueError(f"Test suite with name '{obj_in['name']}' already exists")
-        return super().update(id, obj_in)
+def delete_test_suite(db: Session, test_suite_id: int):
+    db_test_suite = get_test_suite(db, test_suite_id)
+    if db_test_suite:
+        db.delete(db_test_suite)
+        db.commit()
+    return db_test_suite

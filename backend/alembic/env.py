@@ -1,28 +1,28 @@
 from logging.config import fileConfig
-
+import os
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
 from alembic import context
 
-from app.core.config import settings
-from app.models.page import Page
-from app.models.test_case import TestCase
-from app.models.test_suite import TestSuite
-from app.core.database import Base
+from app.core.database import SQLALCHEMY_DATABASE_URL
+from app.models.project import Base
 
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
 config = context.config
 
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# add your model's MetaData object here
+# for 'autogenerate' support
 target_metadata = Base.metadata
 
-def get_url():
-    return settings.SQLALCHEMY_DATABASE_URI
-
 def run_migrations_offline() -> None:
-    url = get_url()
+    """Run migrations in 'offline' mode."""
+    url = SQLALCHEMY_DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -34,8 +34,9 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = get_url()
+    configuration["sqlalchemy.url"] = SQLALCHEMY_DATABASE_URL
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
