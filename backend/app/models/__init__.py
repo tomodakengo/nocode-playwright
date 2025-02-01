@@ -1,3 +1,4 @@
+from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 from app.models.test_suite import TestSuite
 from app.models.test_case import TestCase
