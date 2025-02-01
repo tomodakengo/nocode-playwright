@@ -21,9 +21,12 @@ export default function NewTestSuite() {
     setError(null);
 
     try {
-      const success = await createTestSuite(formData);
-      if (success) {
+      const result = await createTestSuite(formData);
+      if (result.success) {
         router.push("/test-suites");
+        router.refresh();
+      } else if (result.error) {
+        setError(result.error);
       }
     } catch (err) {
       setError(

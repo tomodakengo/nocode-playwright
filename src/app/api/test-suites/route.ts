@@ -55,12 +55,19 @@ export async function POST(request: Request) {
                 function (err) {
                     if (err) {
                         console.error('テストスイート作成エラー:', err);
-                        reject(err);
+                        reject(
+                            NextResponse.json(
+                                { error: 'テストスイートの作成に失敗しました' },
+                                { status: 500 }
+                            )
+                        );
                         return;
                     }
                     resolve(NextResponse.json({ id: this.lastID }, { status: 201 }));
                 }
             );
+        }).catch((error) => {
+            return error;
         });
     } catch (error) {
         console.error('データベース操作エラー:', error);
