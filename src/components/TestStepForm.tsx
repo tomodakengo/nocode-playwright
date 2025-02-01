@@ -33,12 +33,12 @@ interface TestStepFormProps {
   onCancel: () => void;
 }
 
-export default function TestStepForm({
+const TestStepForm = ({
   testCaseId,
   stepId,
   onSuccess,
   onCancel,
-}: TestStepFormProps) {
+}: TestStepFormProps) => {
   const [formData, setFormData] = useState<FormData>({
     action_type_id: 0,
     selector_id: null,
@@ -326,4 +326,6 @@ export default function TestStepForm({
       </div>
     </form>
   );
-}
+};
+
+export default TestStepForm;
