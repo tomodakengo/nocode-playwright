@@ -17,14 +17,16 @@ export async function GET() {
         ORDER BY ts.updated_at DESC`,
                 (err, rows) => {
                     if (err) {
+                        console.error('テストスイート取得エラー:', err);
                         reject(err);
                         return;
                     }
-                    resolve(NextResponse.json(rows));
+                    resolve(NextResponse.json(rows || []));
                 }
             );
         });
     } catch (error) {
+        console.error('データベース初期化エラー:', error);
         return NextResponse.json(
             { error: 'テストスイートの取得に失敗しました' },
             { status: 500 }
@@ -52,6 +54,7 @@ export async function POST(request: Request) {
                 [name, description, tags],
                 function (err) {
                     if (err) {
+                        console.error('テストスイート作成エラー:', err);
                         reject(err);
                         return;
                     }
@@ -60,6 +63,7 @@ export async function POST(request: Request) {
             );
         });
     } catch (error) {
+        console.error('データベース操作エラー:', error);
         return NextResponse.json(
             { error: 'テストスイートの作成に失敗しました' },
             { status: 500 }
