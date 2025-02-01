@@ -3,27 +3,30 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-interface FormData {
-  name: string;
-  description: string;
-  before_each: string;
-  after_each: string;
-}
-
 export default function NewTestCase({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState({
     name: "",
     description: "",
     before_each: "",
     after_each: "",
   });
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    setLoading(true);
     setError(null);
 
     try {
@@ -46,21 +49,14 @@ export default function NewTestCase({ params }: { params: { id: string } }) {
         err instanceof Error ? err.message : "予期せぬエラーが発生しました"
       );
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">新規テストケース</h1>
+        <h1 className="text-2xl font-bold">新規テストケース作成</h1>
       </div>
 
       {error && (
@@ -86,106 +82,94 @@ export default function NewTestCase({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow">
-        <div className="p-6 space-y-6">
-          <div className="space-y-4">
-            {/* 名前 */}
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                名前
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="テストケース名を入力"
-                required
-              />
-            </div>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6 bg-white shadow rounded-lg p-6"
+      >
+        <div>
+          <label
+            htmlFor="name"
+            className="block text-sm font-medium text-gray-700"
+          >
+            テストケース名 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            name="name"
+            id="name"
+            required
+            value={formData.name}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-            {/* 説明 */}
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-gray-700"
-              >
-                説明
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={3}
-                className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="テストケースの説明を入力"
-              />
-            </div>
+        <div>
+          <label
+            htmlFor="description"
+            className="block text-sm font-medium text-gray-700"
+          >
+            説明
+          </label>
+          <textarea
+            name="description"
+            id="description"
+            rows={3}
+            value={formData.description}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-            {/* beforeEach */}
-            <div>
-              <label
-                htmlFor="before_each"
-                className="block text-sm font-medium text-gray-700"
-              >
-                前処理 (beforeEach)
-              </label>
-              <textarea
-                id="before_each"
-                name="before_each"
-                value={formData.before_each}
-                onChange={handleChange}
-                rows={3}
-                className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="各テストステップの実行前に実行する処理を入力"
-              />
-            </div>
+        <div>
+          <label
+            htmlFor="before_each"
+            className="block text-sm font-medium text-gray-700"
+          >
+            前提条件（before_each）
+          </label>
+          <textarea
+            name="before_each"
+            id="before_each"
+            rows={3}
+            value={formData.before_each}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-            {/* afterEach */}
-            <div>
-              <label
-                htmlFor="after_each"
-                className="block text-sm font-medium text-gray-700"
-              >
-                後処理 (afterEach)
-              </label>
-              <textarea
-                id="after_each"
-                name="after_each"
-                value={formData.after_each}
-                onChange={handleChange}
-                rows={3}
-                className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="各テストステップの実行後に実行する処理を入力"
-              />
-            </div>
-          </div>
+        <div>
+          <label
+            htmlFor="after_each"
+            className="block text-sm font-medium text-gray-700"
+          >
+            後処理（after_each）
+          </label>
+          <textarea
+            name="after_each"
+            id="after_each"
+            rows={3}
+            value={formData.after_each}
+            onChange={handleChange}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-          {/* ボタン */}
-          <div className="flex justify-end space-x-4 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              disabled={submitting}
-            >
-              キャンセル
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={submitting}
-            >
-              {submitting ? "作成中..." : "作成"}
-            </button>
-          </div>
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            キャンセル
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "作成中..." : "作成"}
+          </button>
         </div>
       </form>
     </div>

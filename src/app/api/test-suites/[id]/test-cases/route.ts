@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { initializeDatabase } from '@/lib/db/init';
+import { Database } from 'sqlite';
+import sqlite3 from 'sqlite3';
 
 // テストケースの作成
 export async function POST(
@@ -16,57 +18,43 @@ export async function POST(
             );
         }
 
-        const db = await initializeDatabase();
+        const db = await Promise.race([
+            initializeDatabase(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+            )
+        ]) as Database<sqlite3.Database>;
 
         // テストスイートの存在確認
-        return new Promise((resolve, reject) => {
-            db.get(
-                'SELECT id FROM test_suites WHERE id = ?',
-                [params.id],
-                (err, row) => {
-                    if (err) {
-                        console.error('テストスイート確認エラー:', err);
-                        reject(err);
-                        return;
-                    }
+        const testSuite = await db.get(
+            'SELECT id FROM test_suites WHERE id = ?',
+            [params.id]
+        );
 
-                    if (!row) {
-                        resolve(
-                            NextResponse.json(
-                                { error: 'テストスイートが見つかりません' },
-                                { status: 404 }
-                            )
-                        );
-                        return;
-                    }
-
-                    // テストケースの作成
-                    db.run(
-                        `INSERT INTO test_cases (
-              suite_id, 
-              name, 
-              description, 
-              before_each, 
-              after_each
-            ) VALUES (?, ?, ?, ?, ?)`,
-                        [params.id, name, description, before_each, after_each],
-                        function (err) {
-                            if (err) {
-                                console.error('テストケース作成エラー:', err);
-                                reject(err);
-                                return;
-                            }
-
-                            resolve(NextResponse.json({ id: this.lastID }, { status: 201 }));
-                        }
-                    );
-                }
+        if (!testSuite) {
+            return NextResponse.json(
+                { error: 'テストスイートが見つかりません' },
+                { status: 404 }
             );
-        });
+        }
+
+        // テストケースの作成
+        const result = await db.run(
+            `INSERT INTO test_cases (
+                suite_id,
+                name,
+                description,
+                before_each,
+                after_each
+            ) VALUES (?, ?, ?, ?, ?)`,
+            [params.id, name, description, before_each, after_each]
+        );
+
+        return NextResponse.json({ id: result.lastID }, { status: 201 });
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
-            { error: 'テストケースの作成に失敗しました' },
+            { error: error instanceof Error ? error.message : 'テストケースの作成に失敗しました' },
             { status: 500 }
         );
     }
@@ -78,26 +66,23 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const db = await initializeDatabase();
+        const db = await Promise.race([
+            initializeDatabase(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+            )
+        ]) as Database<sqlite3.Database>;
 
-        return new Promise((resolve, reject) => {
-            db.all(
-                'SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at DESC',
-                [params.id],
-                (err, rows) => {
-                    if (err) {
-                        console.error('テストケース一覧取得エラー:', err);
-                        reject(err);
-                        return;
-                    }
-                    resolve(NextResponse.json(rows || []));
-                }
-            );
-        });
+        const testCases = await db.all(
+            'SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at DESC',
+            [params.id]
+        );
+
+        return NextResponse.json(testCases);
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
-            { error: 'テストケースの取得に失敗しました' },
+            { error: error instanceof Error ? error.message : 'テストケースの取得に失敗しました' },
             { status: 500 }
         );
     }
