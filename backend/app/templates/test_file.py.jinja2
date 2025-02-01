@@ -1,0 +1,37 @@
+import { test, expect } from '@playwright/test';
+{% for page in pages %}
+import { {{ page.class_name }} } from '../pages/{{ page.file_name }}';
+{% endfor %}
+
+test.describe('{{ test_suite_name }}', () => {
+    {% if configuration.beforeAll %}
+    test.beforeAll(async ({ browser }) => {
+        {{ configuration.beforeAll | indent(8) }}
+    });
+    {% endif %}
+
+    {% if configuration.afterAll %}
+    test.afterAll(async ({ browser }) => {
+        {{ configuration.afterAll | indent(8) }}
+    });
+    {% endif %}
+
+    {% for test_case in test_cases %}
+    test('{{ test_case.name }}', async ({ page }) => {
+        {% if test_case.before_each %}
+        // Before Each
+        {{ test_case.before_each | indent(8) }}
+        {% endif %}
+
+        {% for step in test_case.steps %}
+        // {{ step.description if step.description else step.action }}
+        {{ step.code | indent(8) }}
+        {% endfor %}
+
+        {% if test_case.after_each %}
+        // After Each
+        {{ test_case.after_each | indent(8) }}
+        {% endif %}
+    });
+    {% endfor %}
+});
