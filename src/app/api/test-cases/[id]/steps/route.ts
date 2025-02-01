@@ -31,25 +31,25 @@ export async function GET(
 
         const steps = await db.all(
             `SELECT 
-        ts.id,
-        ts.action_type_id,
-        at.name as action_type,
-        at.has_value,
-        at.has_selector,
-        at.has_assertion,
-        ts.selector_id,
-        s.name as selector_name,
-        s.selector_type,
-        s.selector_value,
-        ts.input_value,
-        ts.assertion_value,
-        ts.description,
-        ts.order_index
-      FROM test_steps ts
-      LEFT JOIN action_types at ON ts.action_type_id = at.id
-      LEFT JOIN selectors s ON ts.selector_id = s.id
-      WHERE ts.test_case_id = ?
-      ORDER BY ts.order_index ASC`,
+                ts.id,
+                ts.action_type_id,
+                at.name as action_type,
+                at.has_value,
+                at.has_selector,
+                at.has_assertion,
+                ts.selector_id,
+                s.name as selector_name,
+                s.selector_type,
+                s.selector_value,
+                ts.input_value,
+                ts.assertion_value,
+                ts.description,
+                ts.order_index
+            FROM test_steps ts
+            LEFT JOIN action_types at ON ts.action_type_id = at.id
+            LEFT JOIN selectors s ON ts.selector_id = s.id
+            WHERE ts.test_case_id = ?
+            ORDER BY ts.order_index ASC`,
             [params.id]
         );
 
@@ -135,14 +135,14 @@ export async function POST(
 
         const result = await db.run(
             `INSERT INTO test_steps (
-        test_case_id,
-        action_type_id,
-        selector_id,
-        input_value,
-        assertion_value,
-        description,
-        order_index
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                test_case_id,
+                action_type_id,
+                selector_id,
+                input_value,
+                assertion_value,
+                description,
+                order_index
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
                 params.id,
                 action_type_id,

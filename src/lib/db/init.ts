@@ -72,24 +72,6 @@ const initializeDatabase = async () => {
         `);
 
         await db.exec(`
-          CREATE TABLE IF NOT EXISTS test_steps (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            test_case_id INTEGER NOT NULL,
-            action_type_id INTEGER NOT NULL,
-            selector_id INTEGER,
-            input_value TEXT,
-            assertion_value TEXT,
-            description TEXT,
-            order_index INTEGER NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
-            FOREIGN KEY (action_type_id) REFERENCES action_types(id),
-            FOREIGN KEY (selector_id) REFERENCES selectors(id)
-          );
-        `);
-
-        await db.exec(`
           CREATE TABLE IF NOT EXISTS pages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -118,16 +100,24 @@ const initializeDatabase = async () => {
           );
         `);
 
+        // テストステップテーブルを再作成
+        await db.exec(`DROP TABLE IF EXISTS test_steps;`);
+
         await db.exec(`
-          CREATE TABLE IF NOT EXISTS step_selectors (
+          CREATE TABLE IF NOT EXISTS test_steps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            step_id INTEGER NOT NULL,
-            selector_id INTEGER NOT NULL,
+            test_case_id INTEGER NOT NULL,
+            action_type_id INTEGER NOT NULL,
+            selector_id INTEGER,
             input_value TEXT,
+            assertion_value TEXT,
+            description TEXT,
+            order_index INTEGER NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (step_id) REFERENCES test_steps(id) ON DELETE CASCADE,
-            FOREIGN KEY (selector_id) REFERENCES selectors(id) ON DELETE CASCADE
+            FOREIGN KEY (test_case_id) REFERENCES test_cases(id) ON DELETE CASCADE,
+            FOREIGN KEY (action_type_id) REFERENCES action_types(id),
+            FOREIGN KEY (selector_id) REFERENCES selectors(id)
           );
         `);
 
