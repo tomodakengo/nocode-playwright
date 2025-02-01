@@ -14,4 +14,5 @@ class Project(Base):
 
     # リレーションシップ
     test_suites = relationship("TestSuite", back_populates="project", cascade="all, delete-orphan")
-    pages = relationship("Page", back_populates="project", cascade="all, delete-orphan") 
+    pages = relationship("Page", back_populates="project", cascade="all, delete-orphan")
+    test_data = relationship("TestData", back_populates="project", cascade="all, delete-orphan") 

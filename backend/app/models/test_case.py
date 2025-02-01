@@ -23,3 +23,4 @@ class TestCase(Base):
     test_suite = relationship("TestSuite", back_populates="test_cases")
     before_each = Column(JSON, nullable=True)  # 前処理のステップ
     after_each = Column(JSON, nullable=True)  # 後処理のステップ
+    test_data = relationship("TestData", secondary="test_case_data", back_populates="test_cases")
