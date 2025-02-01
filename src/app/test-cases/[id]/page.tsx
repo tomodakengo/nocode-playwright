@@ -1,21 +1,41 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { format } from "date-fns";
-import { getTestCase } from "@/services/api";
+import { PlayIcon } from "@heroicons/react/24/outline";
+import { getTestCase, createTestExecution } from "@/services/api";
 import { Button } from "@/components/ui/Button";
+import ExecutionStatus from "@/components/test-executions/ExecutionStatus";
 
 export default function TestCaseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const testCaseId = Number(params.id);
+  const [currentExecutionId, setCurrentExecutionId] = useState<number | null>(
+    null
+  );
 
   const { data: testCase, isLoading } = useQuery({
     queryKey: ["testCase", testCaseId],
     queryFn: () => getTestCase(testCaseId),
   });
+
+  const executeMutation = useMutation({
+    mutationFn: () =>
+      createTestExecution(testCase!.test_suite_id, {
+        browser_type: "chromium",
+      }),
+    onSuccess: (data) => {
+      setCurrentExecutionId(data.id);
+    },
+  });
+
+  const handleExecute = () => {
+    executeMutation.mutate();
+  };
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -30,14 +50,29 @@ export default function TestCaseDetailPage() {
           </h2>
           <p className="mt-2 text-sm text-gray-500">{testCase?.description}</p>
         </div>
-        <div className="mt-4 flex md:ml-4 md:mt-0">
+        <div className="mt-4 flex md:ml-4 md:mt-0 space-x-3">
+          <Button
+            variant="default"
+            onClick={handleExecute}
+            disabled={executeMutation.isPending || currentExecutionId !== null}
+          >
+            <PlayIcon className="h-5 w-5 mr-2" />
+            テストを実行
+          </Button>
           <Link href={`/test-cases/${testCaseId}/edit`}>
-            <Button variant="outline" className="ml-3">
-              編集
-            </Button>
+            <Button variant="outline">編集</Button>
           </Link>
         </div>
       </div>
+
+      {currentExecutionId && (
+        <div className="mt-8">
+          <ExecutionStatus
+            executionId={currentExecutionId}
+            onComplete={() => setCurrentExecutionId(null)}
+          />
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div className="overflow-hidden rounded-lg bg-white shadow">
