@@ -116,4 +116,87 @@ export async function PUT(
             { status: 500 }
         );
     }
+}
+
+// テストケースの削除
+export async function DELETE(
+    request: Request,
+    { params }: { params: { id: string; testCaseId: string } }
+) {
+    try {
+        const db = await initializeDatabase();
+
+        return new Promise((resolve, reject) => {
+            // トランザクション開始
+            db.run('BEGIN TRANSACTION', (err) => {
+                if (err) {
+                    console.error('トランザクション開始エラー:', err);
+                    reject(err);
+                    return;
+                }
+
+                // テストケースの存在確認
+                db.get(
+                    'SELECT id FROM test_cases WHERE id = ? AND suite_id = ?',
+                    [params.testCaseId, params.id],
+                    (err, row) => {
+                        if (err) {
+                            db.run('ROLLBACK');
+                            console.error('テストケース確認エラー:', err);
+                            reject(err);
+                            return;
+                        }
+
+                        if (!row) {
+                            db.run('ROLLBACK');
+                            resolve(
+                                NextResponse.json(
+                                    { error: 'テストケースが見つかりません' },
+                                    { status: 404 }
+                                )
+                            );
+                            return;
+                        }
+
+                        // テストケースの削除
+                        db.run(
+                            'DELETE FROM test_cases WHERE id = ? AND suite_id = ?',
+                            [params.testCaseId, params.id],
+                            (err) => {
+                                if (err) {
+                                    db.run('ROLLBACK');
+                                    console.error('テストケース削除エラー:', err);
+                                    reject(err);
+                                    return;
+                                }
+
+                                // トランザクションのコミット
+                                db.run('COMMIT', (err) => {
+                                    if (err) {
+                                        db.run('ROLLBACK');
+                                        console.error('トランザクションコミットエラー:', err);
+                                        reject(err);
+                                        return;
+                                    }
+
+                                    resolve(
+                                        NextResponse.json(
+                                            { message: 'テストケースを削除しました' },
+                                            { status: 200 }
+                                        )
+                                    );
+                                });
+                            }
+                        );
+                    }
+                );
+            });
+        });
+    } catch (error) {
+        console.error('データベース操作エラー:', error);
+        return NextResponse.json(
+            { error: 'テストケースの削除に失敗しました' },
+            { status: 500 }
+        );
+    }
 } 
