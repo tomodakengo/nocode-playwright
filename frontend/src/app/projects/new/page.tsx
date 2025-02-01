@@ -3,36 +3,29 @@
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
+import * as z from "zod";
 import { createProject } from "@/services/api";
-import { Button } from "@/components/ui/Button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/Form";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
-  name: z.string().min(1, "必須項目です"),
-  description: z.string().optional(),
+  name: z.string().min(1, "プロジェクト名を入力してください"),
+  description: z.string(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormData = z.infer<typeof formSchema>;
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const form = useForm<FormValues>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-    },
   });
 
   const mutation = useMutation({
@@ -42,69 +35,63 @@ export default function NewProjectPage() {
     },
   });
 
-  const onSubmit = (values: FormValues) => {
-    mutation.mutate(values);
+  const onSubmit = async (data: FormData) => {
+    await mutation.mutateAsync(data);
   };
 
   return (
-    <div>
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-            新規プロジェクト作成
-          </h2>
-        </div>
-      </div>
+    <div className="container py-10">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="text-3xl font-bold mb-8">新規プロジェクト作成</h1>
 
-      <div className="mt-8">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>プロジェクト名</FormLabel>
-                  <FormControl>
-                    <Input placeholder="プロジェクト名を入力" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    プロジェクトを識別するための名前を入力してください。
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="name">プロジェクト名</Label>
+            <Input
+              id="name"
+              {...register("name")}
+              placeholder="プロジェクト名を入力"
             />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>説明</FormLabel>
-                  <FormControl>
-                    <Input placeholder="プロジェクトの説明を入力" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    プロジェクトの説明を入力してください。
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">説明</Label>
+            <Textarea
+              id="description"
+              {...register("description")}
+              placeholder="プロジェクトの説明を入力"
+              rows={4}
             />
-            <div className="flex justify-end gap-x-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/projects")}
-              >
-                キャンセル
-              </Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "作成中..." : "作成"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+            {errors.description && (
+              <p className="text-sm text-red-500">
+                {errors.description.message}
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isSubmitting}
+            >
+              キャンセル
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "作成中..." : "作成"}
+            </Button>
+          </div>
+
+          {mutation.isError && (
+            <p className="text-sm text-red-500">
+              エラーが発生しました。もう一度お試しください。
+            </p>
+          )}
+        </form>
       </div>
     </div>
   );

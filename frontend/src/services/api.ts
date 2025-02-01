@@ -17,28 +17,30 @@ const api = axios.create({
 
 // Projects
 export const getProjects = async () => {
-    const response = await api.get<Project[]>('/projects/');
+    const response = await api.get<Project[]>('/api/projects');
     return response.data;
 };
 
 export const getProject = async (id: number) => {
-    const response = await api.get<Project>(`/projects/${id}`);
+    const response = await api.get<Project>(`/api/projects/${id}`);
     return response.data;
 };
 
-export const createProject = async (data: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
-    const response = await api.post<Project>('/projects/', data);
+export const createProject = async (data: {
+    name: string;
+    description: string;
+}) => {
+    const response = await api.post<Project>('/api/projects', data);
     return response.data;
 };
 
-export const updateProject = async (id: number, data: Partial<Project>) => {
-    const response = await api.put<Project>(`/projects/${id}`, data);
+export const updateProject = async (id: number, data: { name: string; description: string }) => {
+    const response = await api.put<Project>(`/api/projects/${id}`, data);
     return response.data;
 };
 
 export const deleteProject = async (id: number) => {
-    const response = await api.delete<Project>(`/projects/${id}`);
-    return response.data;
+    await api.delete(`/api/projects/${id}`);
 };
 
 // Test Suites

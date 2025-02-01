@@ -3,47 +3,51 @@
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import * as z from "zod";
-import { getProject, updateProject } from "@/services/api";
+import { createTestSuite } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const formSchema = z.object({
-  name: z.string().min(1, "プロジェクト名を入力してください"),
+  name: z.string().min(1, "テストスイート名を入力してください"),
   description: z.string(),
+  browser_type: z.enum(["chromium", "firefox", "webkit"], {
+    required_error: "ブラウザを選択してください",
+  }),
+  base_url: z.string().url("有効なURLを入力してください"),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
-export default function EditProjectPage() {
+export default function NewTestSuitePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = Number(params.id);
-
-  const { data: project, isLoading } = useQuery({
-    queryKey: ["project", projectId],
-    queryFn: () => getProject(projectId),
-  });
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    setValue,
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    values: project
-      ? {
-          name: project.name,
-          description: project.description,
-        }
-      : undefined,
+    defaultValues: {
+      browser_type: "chromium",
+    },
   });
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) => updateProject(projectId, data),
+    mutationFn: (data: FormData) => createTestSuite(projectId, data),
     onSuccess: () => {
       router.push(`/projects/${projectId}`);
     },
@@ -53,40 +57,18 @@ export default function EditProjectPage() {
     await mutation.mutateAsync(data);
   };
 
-  if (isLoading) {
-    return (
-      <div className="container py-10">
-        <div className="h-[400px] flex items-center justify-center">
-          <div className="text-muted-foreground">読み込み中...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="container py-10">
-        <div className="h-[400px] flex items-center justify-center">
-          <div className="text-muted-foreground">
-            プロジェクトが見つかりませんでした。
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container py-10">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-3xl font-bold mb-8">プロジェクトの編集</h1>
+        <h1 className="text-3xl font-bold mb-8">新規テストスイート作成</h1>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="name">プロジェクト名</Label>
+            <Label htmlFor="name">テストスイート名</Label>
             <Input
               id="name"
               {...register("name")}
-              placeholder="プロジェクト名を入力"
+              placeholder="テストスイート名を入力"
             />
             {errors.name && (
               <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -98,13 +80,48 @@ export default function EditProjectPage() {
             <Textarea
               id="description"
               {...register("description")}
-              placeholder="プロジェクトの説明を入力"
+              placeholder="テストスイートの説明を入力"
               rows={4}
             />
             {errors.description && (
               <p className="text-sm text-red-500">
                 {errors.description.message}
               </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="browser_type">ブラウザ</Label>
+            <Select
+              onValueChange={(value) => setValue("browser_type", value as any)}
+              defaultValue="chromium"
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="ブラウザを選択" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="chromium">Chromium</SelectItem>
+                <SelectItem value="firefox">Firefox</SelectItem>
+                <SelectItem value="webkit">WebKit</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.browser_type && (
+              <p className="text-sm text-red-500">
+                {errors.browser_type.message}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="base_url">ベースURL</Label>
+            <Input
+              id="base_url"
+              {...register("base_url")}
+              placeholder="https://example.com"
+              type="url"
+            />
+            {errors.base_url && (
+              <p className="text-sm text-red-500">{errors.base_url.message}</p>
             )}
           </div>
 
@@ -118,7 +135,7 @@ export default function EditProjectPage() {
               キャンセル
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "保存中..." : "保存"}
+              {isSubmitting ? "作成中..." : "作成"}
             </Button>
           </div>
 
