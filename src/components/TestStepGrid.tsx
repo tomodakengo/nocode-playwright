@@ -1,111 +1,46 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  DataGrid,
-  GridColDef,
-  GridActionsCellItem,
-  GridRowModel,
-  GridRowModes,
-  GridRowModesModel,
-  GridToolbarContainer,
-  GridRowOrderChangeParams,
-  gridRowOrderStateSelector,
-  useGridApiRef,
-} from "@mui/x-data-grid";
-import {
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Tooltip,
-  Snackbar,
-  Alert,
-} from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
-import SaveIcon from "@mui/icons-material/Save";
-import CancelIcon from "@mui/icons-material/Cancel";
-import AddIcon from "@mui/icons-material/Add";
-import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-
-interface TestStep {
-  id: number;
-  action_type_id: number;
-  selector_id: number | null;
-  input_value: string;
-  assertion_value: string;
-  description: string;
-  order_index: number;
-}
-
-interface ActionType {
-  id: number;
-  name: string;
-  description: string;
-  has_value: number;
-  has_selector: number;
-  has_assertion: number;
-}
-
-interface Selector {
-  id: number;
-  name: string;
-  selector_type: string;
-  selector_value: string;
-}
+import { useEffect, useState } from "react";
+import { ActionType, Selector, TestStep } from "@/types";
 
 interface TestStepGridProps {
-  testCaseId: string;
-  onStepUpdate?: (step: TestStep) => void;
-}
-
-function EditToolbar(props: { onAdd: () => void }) {
-  return (
-    <GridToolbarContainer>
-      <Button color="primary" startIcon={<AddIcon />} onClick={props.onAdd}>
-        新規ステップ追加
-      </Button>
-    </GridToolbarContainer>
-  );
+  testCaseId: number;
+  onStepUpdate?: (steps: TestStep[]) => void;
 }
 
 export default function TestStepGrid({
   testCaseId,
   onStepUpdate,
 }: TestStepGridProps) {
-  const apiRef = useGridApiRef();
   const [steps, setSteps] = useState<TestStep[]>([]);
   const [actionTypes, setActionTypes] = useState<ActionType[]>([]);
   const [selectors, setSelectors] = useState<Selector[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [stepToDelete, setStepToDelete] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draggedStep, setDraggedStep] = useState<TestStep | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // アクションタイプの取得
-        const actionTypesResponse = await fetch("/api/action-types");
-        const actionTypesData = await actionTypesResponse.json();
+        const [actionTypesRes, selectorsRes, stepsRes] = await Promise.all([
+          fetch("/api/action-types"),
+          fetch("/api/selectors"),
+          fetch(`/api/test-cases/${testCaseId}/steps`),
+        ]);
+
+        const [actionTypesData, selectorsData, stepsData] = await Promise.all([
+          actionTypesRes.json(),
+          selectorsRes.json(),
+          stepsRes.json(),
+        ]);
+
         setActionTypes(actionTypesData);
-
-        // セレクタの取得
-        const selectorsResponse = await fetch("/api/selectors");
-        const selectorsData = await selectorsResponse.json();
         setSelectors(selectorsData);
-
-        // テストステップの取得
-        const stepsResponse = await fetch(
-          `/api/test-cases/${testCaseId}/steps`
-        );
-        const stepsData = await stepsResponse.json();
         setSteps(stepsData);
       } catch (error) {
         console.error("データの取得に失敗しました:", error);
+        setError("データの取得に失敗しました");
       } finally {
         setLoading(false);
       }
@@ -114,203 +49,33 @@ export default function TestStepGrid({
     fetchData();
   }, [testCaseId]);
 
-  const handleRowEditStart = (params: any) => {
-    setRowModesModel({
-      ...rowModesModel,
-      [params.id]: { mode: GridRowModes.Edit },
-    });
-  };
-
-  const handleRowEditStop = (params: any) => {
-    setRowModesModel({
-      ...rowModesModel,
-      [params.id]: { mode: GridRowModes.View },
-    });
-  };
-
-  const handleEditClick = (id: number) => () => {
-    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
-  };
-
-  const handleSaveClick = (id: number) => () => {
-    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
-  };
-
-  const handleCancelClick = (id: number) => () => {
-    setRowModesModel({
-      ...rowModesModel,
-      [id]: { mode: GridRowModes.View, ignoreModifications: true },
-    });
-  };
-
-  const handleDeleteClick = (id: number) => () => {
-    setStepToDelete(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const validateRow = (newRow: TestStep): boolean => {
-    const actionType = actionTypes.find(
-      (type) => type.id === newRow.action_type_id
-    );
-    if (!actionType) return false;
-
-    // セレクタが必要なアクションの場合、セレクタの選択を必須にする
-    if (actionType.has_selector && !newRow.selector_id) {
-      throw new Error("このアクションにはセレクタの選択が必要です");
-    }
-
-    // 入力値が必要なアクションの場合、入力値を必須にする
-    if (actionType.has_value && !newRow.input_value) {
-      throw new Error("このアクションには入力値が必要です");
-    }
-
-    // アサーションが必要なアクションの場合、検証値を必須にする
-    if (actionType.has_assertion && !newRow.assertion_value) {
-      throw new Error("このアクションには検証値が必要です");
-    }
-
-    return true;
-  };
-
-  const handleCloseError = () => {
-    setError(null);
-  };
-
-  const processRowUpdate = async (newRow: TestStep) => {
+  const handleUpdate = async (step: TestStep) => {
     try {
-      // バリデーションチェック
-      if (!validateRow(newRow)) {
-        throw new Error("入力内容が不正です");
-      }
-
       const response = await fetch(
-        `/api/test-cases/${testCaseId}/steps/${newRow.id}`,
+        `/api/test-cases/${testCaseId}/steps/${step.id}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action_type_id: newRow.action_type_id,
-            selector_id: newRow.selector_id,
-            input_value: newRow.input_value || "",
-            assertion_value: newRow.assertion_value || "",
-            description: newRow.description || "",
-            order_index: newRow.order_index,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(step),
         }
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "ステップの更新に失敗しました");
+        throw new Error("更新に失敗しました");
       }
 
       const updatedStep = await response.json();
-      // 更新が成功したら親コンポーネントに通知
+      setSteps(steps.map((s) => (s.id === step.id ? updatedStep : s)));
+      setEditingId(null);
       if (onStepUpdate) {
-        onStepUpdate(updatedStep);
+        onStepUpdate(steps);
       }
-      return updatedStep;
     } catch (error) {
-      console.error("更新エラー:", error);
-      setError(
-        error instanceof Error ? error.message : "ステップの更新に失敗しました"
-      );
-      throw error;
+      setError(error instanceof Error ? error.message : "更新に失敗しました");
     }
   };
 
-  const handleRowOrderChange = async (params: GridRowOrderChangeParams) => {
-    try {
-      const newOrder = params.targetIndex;
-      const stepId = params.row.id;
-
-      // 新しい順序でステップを並び替え
-      const updatedSteps = [...steps];
-      const oldIndex = steps.findIndex((step) => step.id === stepId);
-      const [movedStep] = updatedSteps.splice(oldIndex, 1);
-      updatedSteps.splice(newOrder, 0, movedStep);
-
-      // order_indexを更新
-      const reorderedSteps = updatedSteps.map((step, index) => ({
-        ...step,
-        order_index: index + 1,
-      }));
-
-      // 一時的に新しい順序を反映
-      setSteps(reorderedSteps);
-
-      // バルク更新APIを呼び出し
-      const response = await fetch(
-        `/api/test-cases/${testCaseId}/steps/bulk-update`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            steps: reorderedSteps.map((step) => ({
-              id: step.id,
-              order_index: step.order_index,
-            })),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "順序の更新に失敗しました");
-      }
-
-      const updatedData = await response.json();
-      setSteps(updatedData);
-
-      // 更新成功時、親コンポーネントに通知
-      if (onStepUpdate) {
-        onStepUpdate(updatedData);
-      }
-    } catch (error) {
-      console.error("順序の更新エラー:", error);
-      setError(
-        error instanceof Error ? error.message : "順序の更新に失敗しました"
-      );
-
-      // エラー時は元の順序を復元するため、ステップを再取得
-      const stepsResponse = await fetch(`/api/test-cases/${testCaseId}/steps`);
-      if (stepsResponse.ok) {
-        const stepsData = await stepsResponse.json();
-        setSteps(stepsData);
-      }
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (stepToDelete === null) return;
-
-    try {
-      const response = await fetch(
-        `/api/test-cases/${testCaseId}/steps/${stepToDelete}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("ステップの削除に失敗しました");
-      }
-
-      setSteps(steps.filter((step) => step.id !== stepToDelete));
-    } catch (error) {
-      console.error("削除エラー:", error);
-      setError("ステップの削除に失敗しました");
-    } finally {
-      setDeleteDialogOpen(false);
-      setStepToDelete(null);
-    }
-  };
-
-  const handleAddClick = async () => {
+  const handleAdd = async () => {
     try {
       const newStep = {
         test_case_id: testCaseId,
@@ -324,255 +89,313 @@ export default function TestStepGrid({
 
       const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newStep),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "ステップの作成に失敗しました");
+        throw new Error("作成に失敗しました");
       }
 
       const createdStep = await response.json();
-
-      // ステップリストを更新
       const updatedSteps = [...steps, createdStep];
       setSteps(updatedSteps);
-
-      // 編集モードを設定
-      setRowModesModel({
-        ...rowModesModel,
-        [createdStep.id]: { mode: GridRowModes.Edit },
-      });
-
-      // 親コンポーネントに通知
+      setEditingId(createdStep.id);
       if (onStepUpdate) {
         onStepUpdate(updatedSteps);
       }
     } catch (error) {
-      console.error("作成エラー:", error);
-      setError(
-        error instanceof Error ? error.message : "ステップの作成に失敗しました"
-      );
+      setError(error instanceof Error ? error.message : "作成に失敗しました");
     }
   };
 
-  const handleProcessRowUpdateError = (error: Error) => {
-    setError(error.message);
+  const handleDelete = async (stepId: number) => {
+    if (!confirm("このステップを削除してもよろしいですか？")) return;
+
+    try {
+      const response = await fetch(
+        `/api/test-cases/${testCaseId}/steps/${stepId}`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        throw new Error("削除に失敗しました");
+      }
+
+      const updatedSteps = steps.filter((s) => s.id !== stepId);
+      setSteps(updatedSteps);
+      if (onStepUpdate) {
+        onStepUpdate(updatedSteps);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "削除に失敗しました");
+    }
   };
 
-  const columns: GridColDef[] = [
-    {
-      field: "drag_indicator",
-      headerName: "",
-      width: 50,
-      sortable: false,
-      filterable: false,
-      hideable: false,
-      disableColumnMenu: true,
-      disableReorder: true,
-      renderCell: () => (
-        <Tooltip title="ドラッグして順序を変更">
-          <div className="flex items-center justify-center w-full h-full cursor-move">
-            <DragIndicatorIcon />
-          </div>
-        </Tooltip>
-      ),
-    },
-    {
-      field: "order_index",
-      headerName: "順序",
-      width: 70,
-      editable: false,
-      type: "number",
-    },
-    {
-      field: "action_type_id",
-      headerName: "アクション",
-      width: 150,
-      editable: true,
-      type: "singleSelect",
-      valueOptions: actionTypes.map((type) => ({
-        value: type.id,
-        label: type.name,
-        description: type.description,
-      })),
-      renderCell: (params) => {
-        const actionType = actionTypes.find((type) => type.id === params.value);
-        return (
-          <Tooltip title={actionType?.description || ""}>
-            <span>{actionType?.name || ""}</span>
-          </Tooltip>
-        );
-      },
-      valueFormatter: (params) => params.value || "",
-    },
-    {
-      field: "selector_id",
-      headerName: "セレクタ",
-      width: 200,
-      editable: true,
-      type: "singleSelect",
-      valueOptions: selectors.map((selector) => ({
-        value: selector.id,
-        label: `${selector.name} (${selector.selector_value})`,
-      })),
-      renderCell: (params) => {
-        const selector = selectors.find((s) => s.id === params.value);
-        return selector ? `${selector.name} (${selector.selector_value})` : "";
-      },
-      valueFormatter: (params) => params.value || "",
-      preProcessEditCellProps: (params) => ({
-        ...params.props,
-        value: params.props.value || "",
-      }),
-    },
-    {
-      field: "input_value",
-      headerName: "入力値",
-      width: 150,
-      editable: true,
-      valueFormatter: (params) => params.value || "",
-    },
-    {
-      field: "assertion_value",
-      headerName: "検証値",
-      width: 150,
-      editable: true,
-      valueFormatter: (params) => params.value || "",
-    },
-    {
-      field: "description",
-      headerName: "説明",
-      width: 200,
-      editable: true,
-      valueFormatter: (params) => params.value || "",
-    },
-    {
-      field: "actions",
-      type: "actions",
-      headerName: "操作",
-      width: 100,
-      cellClassName: "actions",
-      getActions: ({ id }) => {
-        const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
+  const handleDragStart = (step: TestStep) => {
+    setDraggedStep(step);
+  };
 
-        if (isInEditMode) {
-          return [
-            <GridActionsCellItem
-              key="save"
-              icon={<SaveIcon />}
-              label="保存"
-              onClick={handleSaveClick(id as number)}
-            />,
-            <GridActionsCellItem
-              key="cancel"
-              icon={<CancelIcon />}
-              label="キャンセル"
-              className="textPrimary"
-              onClick={handleCancelClick(id as number)}
-              color="inherit"
-            />,
-          ];
+  const handleDragOver = (e: React.DragEvent, targetStep: TestStep) => {
+    e.preventDefault();
+    if (!draggedStep || draggedStep.id === targetStep.id) return;
+
+    const updatedSteps = [...steps];
+    const draggedIndex = steps.findIndex((s) => s.id === draggedStep.id);
+    const targetIndex = steps.findIndex((s) => s.id === targetStep.id);
+
+    updatedSteps.splice(draggedIndex, 1);
+    updatedSteps.splice(targetIndex, 0, draggedStep);
+
+    setSteps(
+      updatedSteps.map((step, index) => ({
+        ...step,
+        order_index: index + 1,
+      }))
+    );
+  };
+
+  const handleDragEnd = async () => {
+    if (!draggedStep) return;
+    setDraggedStep(null);
+
+    try {
+      const response = await fetch(
+        `/api/test-cases/${testCaseId}/steps/bulk-update`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            steps: steps.map((step) => ({
+              id: step.id,
+              order_index: step.order_index,
+            })),
+          }),
         }
+      );
 
-        return [
-          <GridActionsCellItem
-            key="edit"
-            icon={<EditIcon />}
-            label="編集"
-            className="textPrimary"
-            onClick={handleEditClick(id as number)}
-            color="inherit"
-          />,
-          <GridActionsCellItem
-            key="delete"
-            icon={<DeleteIcon />}
-            label="削除"
-            onClick={handleDeleteClick(id as number)}
-            color="inherit"
-          />,
-        ];
-      },
-    },
-  ];
+      if (!response.ok) {
+        throw new Error("順序の更新に失敗しました");
+      }
+
+      const updatedSteps = await response.json();
+      setSteps(updatedSteps);
+      if (onStepUpdate) {
+        onStepUpdate(updatedSteps);
+      }
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "順序の更新に失敗しました"
+      );
+      // エラー時は元の順序を復元
+      const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
+      const stepsData = await stepsRes.json();
+      setSteps(stepsData);
+    }
+  };
 
   if (loading) {
-    return <div>読み込み中...</div>;
+    return <div className="p-4">読み込み中...</div>;
   }
 
   return (
-    <div className="h-[600px] w-full">
-      <DataGrid
-        rows={steps}
-        columns={columns}
-        editMode="row"
-        rowModesModel={rowModesModel}
-        onRowModesModelChange={(newModel) => setRowModesModel(newModel)}
-        onRowEditStart={handleRowEditStart}
-        onRowEditStop={handleRowEditStop}
-        processRowUpdate={processRowUpdate}
-        onProcessRowUpdateError={handleProcessRowUpdateError}
-        rowReordering
-        onRowOrderChange={handleRowOrderChange}
-        slots={{
-          toolbar: EditToolbar,
-        }}
-        slotProps={{
-          toolbar: { onAdd: handleAddClick },
-        }}
-        apiRef={apiRef}
-        disableRowSelectionOnClick
-        getRowClassName={() => "cursor-move"}
-        sx={{
-          "& .MuiDataGrid-row": {
-            cursor: "move",
-          },
-          "& .MuiDataGrid-cell:focus": {
-            outline: "none",
-          },
-          "& .MuiDataGrid-row--dragging": {
-            backgroundColor: "grey.200",
-            opacity: 0.5,
-          },
-        }}
-        initialState={{
-          columns: {
-            columnVisibilityModel: {
-              id: false,
-            },
-          },
-        }}
-      />
+    <div className="w-full">
+      <div className="mb-4">
+        <button
+          onClick={handleAdd}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          ステップを追加
+        </button>
+      </div>
 
-      {/* 削除確認ダイアログ */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
-        <DialogTitle>ステップの削除</DialogTitle>
-        <DialogContent>このステップを削除してもよろしいですか？</DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>キャンセル</Button>
-          <Button onClick={handleDeleteConfirm} color="error">
-            削除
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <div className="border rounded">
+        {/* ヘッダー行 */}
+        <div className="grid grid-cols-7 gap-2 p-2 bg-gray-100 font-bold border-b">
+          <div className="col-span-1">順序</div>
+          <div className="col-span-1">アクション</div>
+          <div className="col-span-1">セレクタ</div>
+          <div className="col-span-1">入力値</div>
+          <div className="col-span-1">検証値</div>
+          <div className="col-span-1">説明</div>
+          <div className="col-span-1">操作</div>
+        </div>
 
-      {/* エラーメッセージ表示 */}
-      <Snackbar
-        open={error !== null}
-        autoHideDuration={6000}
-        onClose={handleCloseError}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={handleCloseError} severity="error">
+        {/* データ行 */}
+        {steps.map((step) => (
+          <div
+            key={step.id}
+            draggable
+            onDragStart={() => handleDragStart(step)}
+            onDragOver={(e) => handleDragOver(e, step)}
+            onDragEnd={handleDragEnd}
+            className={`grid grid-cols-7 gap-2 p-2 border-b hover:bg-gray-50 ${
+              draggedStep?.id === step.id ? "opacity-50 bg-gray-100" : ""
+            }`}
+          >
+            {editingId === step.id ? (
+              // 編集モード
+              <>
+                <div className="col-span-1 flex items-center">
+                  {step.order_index}
+                </div>
+                <div className="col-span-1">
+                  <select
+                    value={step.action_type_id}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((s) =>
+                          s.id === step.id
+                            ? { ...s, action_type_id: Number(e.target.value) }
+                            : s
+                        )
+                      )
+                    }
+                    className="w-full p-1 border rounded"
+                  >
+                    {actionTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <select
+                    value={step.selector_id || ""}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((s) =>
+                          s.id === step.id
+                            ? {
+                                ...s,
+                                selector_id: e.target.value
+                                  ? Number(e.target.value)
+                                  : null,
+                              }
+                            : s
+                        )
+                      )
+                    }
+                    className="w-full p-1 border rounded"
+                  >
+                    <option value="">選択してください</option>
+                    {selectors.map((selector) => (
+                      <option key={selector.id} value={selector.id}>
+                        {selector.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <input
+                    type="text"
+                    value={step.input_value || ""}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((s) =>
+                          s.id === step.id
+                            ? { ...s, input_value: e.target.value }
+                            : s
+                        )
+                      )
+                    }
+                    className="w-full p-1 border rounded"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <input
+                    type="text"
+                    value={step.assertion_value || ""}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((s) =>
+                          s.id === step.id
+                            ? { ...s, assertion_value: e.target.value }
+                            : s
+                        )
+                      )
+                    }
+                    className="w-full p-1 border rounded"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <input
+                    type="text"
+                    value={step.description || ""}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((s) =>
+                          s.id === step.id
+                            ? { ...s, description: e.target.value }
+                            : s
+                        )
+                      )
+                    }
+                    className="w-full p-1 border rounded"
+                  />
+                </div>
+                <div className="col-span-1 flex gap-2">
+                  <button
+                    onClick={() => handleUpdate(step)}
+                    className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </>
+            ) : (
+              // 表示モード
+              <>
+                <div className="col-span-1 flex items-center cursor-move">
+                  {step.order_index}
+                </div>
+                <div className="col-span-1">
+                  {actionTypes.find((t) => t.id === step.action_type_id)?.name}
+                </div>
+                <div className="col-span-1">
+                  {selectors.find((s) => s.id === step.selector_id)?.name}
+                </div>
+                <div className="col-span-1">{step.input_value}</div>
+                <div className="col-span-1">{step.assertion_value}</div>
+                <div className="col-span-1">{step.description}</div>
+                <div className="col-span-1 flex gap-2">
+                  <button
+                    onClick={() => setEditingId(step.id)}
+                    className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    編集
+                  </button>
+                  <button
+                    onClick={() => handleDelete(step.id)}
+                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    削除
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
           {error}
-        </Alert>
-      </Snackbar>
+          <button
+            onClick={() => setError(null)}
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
