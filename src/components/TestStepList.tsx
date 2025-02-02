@@ -63,7 +63,17 @@ export default function TestStepList({
           throw new Error("テストステップの取得に失敗しました");
         }
         const stepsData = await stepsResponse.json();
-        setSteps(stepsData);
+
+        // アクションタイプの情報を付加
+        const stepsWithActions = stepsData.map((step: any) => ({
+          ...step,
+          action_type:
+            actionTypesData.find(
+              (at: ActionType) => at.id === step.action_type_id
+            )?.name || "不明",
+        }));
+
+        setSteps(stepsWithActions);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "予期せぬエラーが発生しました"

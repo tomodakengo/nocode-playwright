@@ -156,9 +156,6 @@ export default function TestStepForm({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          test_case_id: parseInt(caseId),
-          name: selectedAction.name,
-          action: selectedAction.name,
           action_type_id: parseInt(formData.action_type_id),
           selector_id:
             selectedAction.has_selector && formData.selector_id
@@ -169,7 +166,6 @@ export default function TestStepForm({
             ? formData.assertion_value
             : null,
           description: formData.description || null,
-          order_index: stepId ? undefined : 9999,
         }),
       });
 

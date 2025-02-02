@@ -40,6 +40,7 @@ export default function TestCaseDetail({
   const [deleting, setDeleting] = useState(false);
   const [isStepFormOpen, setIsStepFormOpen] = useState(false);
   const [selectedStep, setSelectedStep] = useState<TestStep | null>(null);
+  const [key, setKey] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,6 +105,7 @@ export default function TestCaseDetail({
   const handleStepFormSuccess = () => {
     setIsStepFormOpen(false);
     setSelectedStep(null);
+    setKey((prev) => prev + 1);
   };
 
   if (loading) {
@@ -248,7 +250,8 @@ export default function TestCaseDetail({
           </div>
 
           <TestStepList
-            testCaseId={params.testCaseId}
+            key={key}
+            testCaseId={`${params.id}/${params.testCaseId}`}
             onStepSelect={handleStepSelect}
           />
         </div>

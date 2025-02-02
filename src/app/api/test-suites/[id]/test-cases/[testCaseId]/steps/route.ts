@@ -9,11 +9,17 @@ export async function POST(
     { params }: { params: { id: string; testCaseId: string } }
 ) {
     try {
-        const { name, description, action, expected_result } = await request.json();
+        const {
+            action_type_id,
+            selector_id,
+            input_value,
+            assertion_value,
+            description,
+        } = await request.json();
 
-        if (!name || !action) {
+        if (!action_type_id) {
             return NextResponse.json(
-                { error: 'ステップ名とアクションは必須です' },
+                { error: 'アクションタイプは必須です' },
                 { status: 400 }
             );
         }
@@ -50,18 +56,20 @@ export async function POST(
         const result = await db.run(
             `INSERT INTO test_steps (
                 test_case_id,
-                name,
+                action_type_id,
+                selector_id,
+                input_value,
+                assertion_value,
                 description,
-                action,
-                expected_result,
                 order_index
-            ) VALUES (?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
                 params.testCaseId,
-                name,
+                action_type_id,
+                selector_id,
+                input_value,
+                assertion_value,
                 description,
-                action,
-                expected_result,
                 nextOrder,
             ]
         );
