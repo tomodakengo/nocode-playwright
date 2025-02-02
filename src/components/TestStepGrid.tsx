@@ -51,50 +51,133 @@ export default function TestStepGrid({
 
   const handleUpdate = async (step: TestStep) => {
     try {
+      // バリデーション
+      if (!step.action_type_id) {
+        setError("アクションタイプを選択してください");
+        return;
+      }
+
+      // ステップが存在することを確認
+      const checkResponse = await fetch(
+        `/api/test-cases/${testCaseId}/steps/${step.id}`
+      );
+
+      if (!checkResponse.ok) {
+        // ステップが見つからない場合、最新のデータを再取得
+        const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
+        const stepsData = await stepsRes.json();
+        setSteps(stepsData);
+        setError("ステップが見つかりません。データを更新しました。");
+        setEditingId(null);
+        return;
+      }
+
+      // 更新用のデータを整形
+      const updateData = {
+        test_case_id: Number(testCaseId),
+        action_type_id: Number(step.action_type_id),
+        selector_id: step.selector_id ? Number(step.selector_id) : null,
+        input_value: step.input_value || "",
+        assertion_value: step.assertion_value || "",
+        description: step.description || "",
+        order_index: Number(step.order_index),
+      };
+
+      console.log("更新データ:", updateData);
+
       const response = await fetch(
         `/api/test-cases/${testCaseId}/steps/${step.id}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(step),
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(updateData),
         }
       );
 
       if (!response.ok) {
-        throw new Error("更新に失敗しました");
+        const errorData = await response.json().catch(() => null);
+        console.error("サーバーエラーレスポンス:", errorData);
+        throw new Error(
+          errorData?.message ||
+            `更新に失敗しました (${response.status}): ${errorData?.error || ""}`
+        );
       }
 
       const updatedStep = await response.json();
-      setSteps(steps.map((s) => (s.id === step.id ? updatedStep : s)));
+      const updatedSteps = steps.map((s) =>
+        s.id === step.id ? updatedStep : s
+      );
+      setSteps(updatedSteps);
       setEditingId(null);
       if (onStepUpdate) {
-        onStepUpdate(steps);
+        onStepUpdate(updatedSteps);
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "更新に失敗しました");
+      console.error("ステップ更新エラー:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "ステップの更新中に予期せぬエラーが発生しました"
+      );
+
+      // エラー後にステップを再取得
+      try {
+        const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
+        if (stepsRes.ok) {
+          const stepsData = await stepsRes.json();
+          setSteps(stepsData);
+          setEditingId(null);
+        }
+      } catch (fetchError) {
+        console.error("ステップの再取得に失敗:", fetchError);
+      }
     }
   };
 
   const handleAdd = async () => {
     try {
+      // バリデーション：アクションタイプが存在することを確認
+      if (!actionTypes.length) {
+        setError("アクションタイプが設定されていません");
+        return;
+      }
+
+      // 現在の最大order_indexを取得
+      const maxOrderIndex = steps.reduce(
+        (max, step) => Math.max(max, step.order_index || 0),
+        0
+      );
+
       const newStep = {
-        test_case_id: testCaseId,
-        action_type_id: actionTypes[0]?.id || "",
-        selector_id: "",
+        test_case_id: Number(testCaseId), // 数値型に変換
+        action_type_id: Number(actionTypes[0]?.id),
+        selector_id: null,
         input_value: "",
         assertion_value: "",
         description: "",
-        order_index: steps.length + 1,
+        order_index: maxOrderIndex + 1,
       };
+
+      console.log("新規ステップデータ:", newStep);
 
       const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify(newStep),
       });
 
       if (!response.ok) {
-        throw new Error("作成に失敗しました");
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message ||
+            `ステップの作成に失敗しました (${response.status})`
+        );
       }
 
       const createdStep = await response.json();
@@ -105,7 +188,16 @@ export default function TestStepGrid({
         onStepUpdate(updatedSteps);
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "作成に失敗しました");
+      console.error("ステップ作成エラー:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "ステップの作成中に予期せぬエラーが発生しました"
+      );
+      // エラー後にステップを再取得
+      const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
+      const stepsData = await stepsRes.json();
+      setSteps(stepsData);
     }
   };
 
