@@ -5,6 +5,10 @@ import { Fragment, useEffect, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import TestStepList from "@/components/TestStepList";
 import TestStepForm from "@/components/TestStepForm";
+import { format } from "date-fns";
+import { ja } from "date-fns/locale";
+import TestStepGrid from "@/components/TestStepGrid";
+import { Button } from "@mui/material";
 
 interface TestCase {
   id: number;
@@ -38,6 +42,8 @@ export default function TestCaseDetail({
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState<string>("");
   const [isStepFormOpen, setIsStepFormOpen] = useState(false);
   const [selectedStep, setSelectedStep] = useState<TestStep | null>(null);
   const [key, setKey] = useState(0);
@@ -70,6 +76,8 @@ export default function TestCaseDetail({
   }, [params.id, params.testCaseId]);
 
   const handleDelete = async () => {
+    if (!testCase) return;
+
     setDeleting(true);
     setError(null);
 
@@ -91,9 +99,9 @@ export default function TestCaseDetail({
       setError(
         err instanceof Error ? err.message : "予期せぬエラーが発生しました"
       );
-      setShowDeleteConfirm(false);
     } finally {
       setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -106,6 +114,22 @@ export default function TestCaseDetail({
     setIsStepFormOpen(false);
     setSelectedStep(null);
     setKey((prev) => prev + 1);
+  };
+
+  const handleGenerateCode = async () => {
+    try {
+      const response = await fetch(
+        `/api/test-cases/${params.testCaseId}/generate`
+      );
+      if (!response.ok) {
+        throw new Error("コードの生成に失敗しました");
+      }
+      const data = await response.json();
+      setGeneratedCode(data.code);
+      setShowPreview(true);
+    } catch (error) {
+      console.error("コード生成エラー:", error);
+    }
   };
 
   if (loading) {
@@ -156,12 +180,13 @@ export default function TestCaseDetail({
           </p>
         </div>
         <div className="space-x-4">
-          <button
-            onClick={() => router.back()}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleGenerateCode}
           >
-            戻る
-          </button>
+            Playwrightコードを生成
+          </Button>
           <button
             onClick={() =>
               router.push(
@@ -220,13 +245,17 @@ export default function TestCaseDetail({
               <div>
                 <dt className="text-sm font-medium text-gray-500">作成日時</dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  {new Date(testCase.created_at).toLocaleString("ja-JP")}
+                  {format(new Date(testCase.created_at), "yyyy/MM/dd HH:mm", {
+                    locale: ja,
+                  })}
                 </dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">更新日時</dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  {new Date(testCase.updated_at).toLocaleString("ja-JP")}
+                  {format(new Date(testCase.updated_at), "yyyy/MM/dd HH:mm", {
+                    locale: ja,
+                  })}
                 </dd>
               </div>
             </dl>
@@ -256,6 +285,26 @@ export default function TestCaseDetail({
           />
         </div>
       </div>
+
+      {/* テストステップグリッド */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">
+          テストステップ
+        </h2>
+        <TestStepGrid testCaseId={params.testCaseId} />
+      </div>
+
+      {/* 生成されたコードのプレビュー */}
+      {showPreview && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">
+            生成されたPlaywrightコード
+          </h2>
+          <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto">
+            <code>{generatedCode}</code>
+          </pre>
+        </div>
+      )}
 
       {/* 削除確認モーダル */}
       <Transition appear show={showDeleteConfirm} as={Fragment}>
