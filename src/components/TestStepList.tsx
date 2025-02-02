@@ -104,7 +104,7 @@ export default function TestStepList({
     try {
       const [suiteId, caseId] = testCaseId.split("/");
       const response = await fetch(
-        `/api/test-suites/${suiteId}/test-cases/${caseId}/steps`,
+        `/api/test-suites/${suiteId}/test-cases/${caseId}/steps/reorder`,
         {
           method: "PUT",
           headers: {
