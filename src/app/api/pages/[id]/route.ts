@@ -17,11 +17,11 @@ export async function GET(
         ]) as Database<sqlite3.Database>;
 
         const page = await db.get(
-            `SELECT p.*, COUNT(s.id) as selector_count
+            `SELECT 
+                p.*,
+                (SELECT COUNT(*) FROM selectors s WHERE s.page_id = p.id) as selector_count
              FROM pages p
-             LEFT JOIN selectors s ON p.id = s.page_id
-             WHERE p.id = ?
-             GROUP BY p.id`,
+             WHERE p.id = ?`,
             [params.id]
         );
 

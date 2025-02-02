@@ -33,7 +33,9 @@ export async function GET(
             [params.id]
         );
 
-        return NextResponse.json(selectors);
+        console.log('Fetched selectors:', selectors); // デバッグ用ログ
+
+        return NextResponse.json(selectors || []);
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
@@ -108,13 +110,15 @@ export async function POST(
                 description
             ) VALUES (?, ?, ?, ?, ?)`,
             [
-                params.id,
+                parseInt(params.id, 10),  // 文字列から数値に変換
                 name,
                 selector_type.toLowerCase(),
                 selector_value,
                 description || null
             ]
         );
+
+        console.log('Created selector:', { id: result.lastID, page_id: params.id }); // デバッグ用ログ
 
         return NextResponse.json({ id: result.lastID }, { status: 201 });
     } catch (error) {
