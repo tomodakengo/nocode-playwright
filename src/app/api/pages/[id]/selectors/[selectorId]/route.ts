@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initializeDatabase } from '@/lib/db/init';
+import { initializeDatabase } from '@/lib/db';
 import { Database } from 'sqlite';
 import sqlite3 from 'sqlite3';
 
@@ -131,42 +131,38 @@ export async function DELETE(
             )
         ]) as Database<sqlite3.Database>;
 
-        await db.run('BEGIN TRANSACTION');
+        // セレクタの存在確認
+        const selector = await db.get(
+            'SELECT id FROM selectors WHERE id = ? AND page_id = ?',
+            [params.selectorId, params.id]
+        );
 
-        try {
-            // セレクタの存在確認
-            const selector = await db.get(
-                'SELECT id FROM selectors WHERE id = ? AND page_id = ?',
-                [params.selectorId, params.id]
-            );
-
-            if (!selector) {
-                await db.run('ROLLBACK');
-                return NextResponse.json(
-                    { error: 'セレクタが見つかりません' },
-                    { status: 404 }
-                );
-            }
-
-            // 関連するステップセレクタの削除（CASCADE設定済みのため不要だが、明示的に削除）
-            await db.run('DELETE FROM step_selectors WHERE selector_id = ?', [params.selectorId]);
-
-            // セレクタの削除
-            await db.run(
-                'DELETE FROM selectors WHERE id = ? AND page_id = ?',
-                [params.selectorId, params.id]
-            );
-
-            await db.run('COMMIT');
-
+        if (!selector) {
             return NextResponse.json(
-                { message: 'セレクタを削除しました' },
-                { status: 200 }
+                { error: 'セレクタが見つかりません' },
+                { status: 404 }
             );
-        } catch (error) {
-            await db.run('ROLLBACK');
-            throw error;
         }
+
+        // セレクタが使用されているかチェック
+        const usedSteps = await db.get(
+            'SELECT id FROM test_steps WHERE selector_id = ? LIMIT 1',
+            [params.selectorId]
+        );
+
+        if (usedSteps) {
+            return NextResponse.json(
+                { error: 'このセレクタは使用中のため削除できません' },
+                { status: 400 }
+            );
+        }
+
+        await db.run('DELETE FROM selectors WHERE id = ? AND page_id = ?', [
+            params.selectorId,
+            params.id,
+        ]);
+
+        return NextResponse.json({ success: true });
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { initializeDatabase } from '@/lib/db/init';
-import { Database } from 'sqlite';
-import sqlite3 from 'sqlite3';
+import { initializeDatabase } from '@/lib/db';
+import { Database } from 'sqlite3';
 
 // セレクタ一覧の取得
 export async function GET(
@@ -30,31 +29,39 @@ export async function GET(
         }
 
         const selectors = await db.all(
-            `SELECT * FROM selectors WHERE page_id = ? ORDER BY name ASC`,
+            'SELECT * FROM selectors WHERE page_id = ? ORDER BY name',
             [params.id]
         );
 
-        return NextResponse.json(selectors || []);
+        return NextResponse.json(selectors);
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'セレクタ一覧の取得に失敗しました' },
+            { error: error instanceof Error ? error.message : 'セレクタの取得に失敗しました' },
             { status: 500 }
         );
     }
 }
 
-// セレクタの作成
+// 新規セレクタの作成
 export async function POST(
     request: Request,
     { params }: { params: { id: string } }
 ) {
     try {
-        const { name, selector_type, selector_value, description, is_dynamic, wait_condition } = await request.json();
+        const { name, selector_type, selector_value, description } = await request.json();
 
         if (!name || !selector_type || !selector_value) {
             return NextResponse.json(
                 { error: 'セレクタ名、タイプ、値は必須です' },
+                { status: 400 }
+            );
+        }
+
+        // セレクタタイプの検証
+        if (!['xpath', 'css'].includes(selector_type.toLowerCase())) {
+            return NextResponse.json(
+                { error: 'セレクタタイプはXPathまたはCSSのいずれかを指定してください' },
                 { status: 400 }
             );
         }
@@ -79,15 +86,15 @@ export async function POST(
             );
         }
 
-        // セレクタ名の重複チェック
-        const existingSelector = await db.get(
+        // 同名のセレクタが存在するかチェック
+        const existing = await db.get(
             'SELECT id FROM selectors WHERE page_id = ? AND name = ?',
             [params.id, name]
         );
 
-        if (existingSelector) {
+        if (existing) {
             return NextResponse.json(
-                { error: '同じ名前のセレクタが既に存在します' },
+                { error: '同名のセレクタが既に存在します' },
                 { status: 400 }
             );
         }
@@ -98,18 +105,14 @@ export async function POST(
                 name,
                 selector_type,
                 selector_value,
-                description,
-                is_dynamic,
-                wait_condition
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                description
+            ) VALUES (?, ?, ?, ?, ?)`,
             [
                 params.id,
                 name,
-                selector_type,
+                selector_type.toLowerCase(),
                 selector_value,
-                description,
-                is_dynamic ? 1 : 0,
-                wait_condition
+                description || null
             ]
         );
 
