@@ -148,7 +148,7 @@ export default function TestStepGrid({
     setDeleteDialogOpen(true);
   };
 
-  const validateRow = (newRow: GridRowModel): boolean => {
+  const validateRow = (newRow: TestStep): boolean => {
     const actionType = actionTypes.find(
       (type) => type.id === newRow.action_type_id
     );
@@ -176,7 +176,7 @@ export default function TestStepGrid({
     setError(null);
   };
 
-  const processRowUpdate = async (newRow: GridRowModel) => {
+  const processRowUpdate = async (newRow: TestStep) => {
     try {
       // バリデーションチェック
       if (!validateRow(newRow)) {
@@ -190,21 +190,32 @@ export default function TestStepGrid({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(newRow),
+          body: JSON.stringify({
+            action_type_id: newRow.action_type_id,
+            selector_id: newRow.selector_id,
+            input_value: newRow.input_value || "",
+            assertion_value: newRow.assertion_value || "",
+            description: newRow.description || "",
+            order_index: newRow.order_index,
+          }),
         }
       );
 
       if (!response.ok) {
-        throw new Error("ステップの更新に失敗しました");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "ステップの更新に失敗しました");
       }
 
-      const updatedRow = { ...newRow, isNew: false };
-      setSteps(steps.map((row) => (row.id === newRow.id ? updatedRow : row)));
-      return updatedRow;
+      const updatedStep = await response.json();
+      // 更新が成功したら親コンポーネントに通知
+      if (onStepUpdate) {
+        onStepUpdate(updatedStep);
+      }
+      return updatedStep;
     } catch (error) {
       console.error("更新エラー:", error);
       setError(
-        error instanceof Error ? error.message : "更新中にエラーが発生しました"
+        error instanceof Error ? error.message : "ステップの更新に失敗しました"
       );
       throw error;
     }
@@ -315,6 +326,10 @@ export default function TestStepGrid({
       console.error("作成エラー:", error);
       setError("ステップの作成に失敗しました");
     }
+  };
+
+  const handleProcessRowUpdateError = (error: Error) => {
+    setError(error.message);
   };
 
   const columns: GridColDef[] = [
@@ -463,6 +478,7 @@ export default function TestStepGrid({
         onRowEditStart={handleRowEditStart}
         onRowEditStop={handleRowEditStop}
         processRowUpdate={processRowUpdate}
+        onProcessRowUpdateError={handleProcessRowUpdateError}
         rowReordering
         onRowOrderChange={handleRowOrderChange}
         slots={{
@@ -480,6 +496,13 @@ export default function TestStepGrid({
           },
           "& .MuiDataGrid-cell:focus": {
             outline: "none",
+          },
+        }}
+        initialState={{
+          columns: {
+            columnVisibilityModel: {
+              id: false,
+            },
           },
         }}
       />

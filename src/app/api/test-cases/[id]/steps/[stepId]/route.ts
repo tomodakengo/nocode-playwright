@@ -59,14 +59,15 @@ export async function PUT(
         const {
             action_type_id,
             selector_id,
-            input_value,
-            assertion_value,
-            description,
+            input_value = "",
+            assertion_value = "",
+            description = "",
+            order_index,
         } = await request.json();
 
-        if (!action_type_id) {
+        if (!action_type_id || order_index === undefined) {
             return NextResponse.json(
-                { error: "アクションタイプは必須です" },
+                { error: "アクションタイプと順序は必須です" },
                 { status: 400 }
             );
         }
@@ -121,25 +122,44 @@ export async function PUT(
 
         await db.run(
             `UPDATE test_steps 
-      SET action_type_id = ?,
-          selector_id = ?,
-          input_value = ?,
-          assertion_value = ?,
-          description = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND test_case_id = ?`,
+             SET action_type_id = ?,
+                 selector_id = ?,
+                 input_value = ?,
+                 assertion_value = ?,
+                 description = ?,
+                 order_index = ?
+             WHERE id = ? AND test_case_id = ?`,
             [
                 action_type_id,
                 selector_id,
                 input_value,
                 assertion_value,
                 description,
+                order_index,
                 params.stepId,
                 params.id,
             ]
         );
 
-        return NextResponse.json({ message: "テストステップを更新しました" });
+        // 更新後のデータを取得
+        const updatedStep = await db.get(
+            `SELECT 
+                ts.*,
+                at.name as action_type,
+                at.has_value,
+                at.has_selector,
+                at.has_assertion,
+                s.name as selector_name,
+                s.selector_type,
+                s.selector_value
+            FROM test_steps ts
+            LEFT JOIN action_types at ON ts.action_type_id = at.id
+            LEFT JOIN selectors s ON ts.selector_id = s.id
+            WHERE ts.id = ? AND ts.test_case_id = ?`,
+            [params.stepId, params.id]
+        );
+
+        return NextResponse.json(updatedStep);
     } catch (error) {
         console.error("データベース操作エラー:", error);
         return NextResponse.json(
