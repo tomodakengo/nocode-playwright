@@ -3,8 +3,6 @@
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import TestStepList from "@/components/TestStepList";
-import TestStepForm from "@/components/TestStepForm";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 import TestStepGrid from "@/components/TestStepGrid";
@@ -22,15 +20,6 @@ interface TestCase {
   updated_at: string;
 }
 
-interface TestStep {
-  id: number;
-  action_type: string;
-  selector_name: string | null;
-  input_value: string | null;
-  assertion_value: string | null;
-  description: string | null;
-}
-
 export default function TestCaseDetail({
   params,
 }: {
@@ -44,9 +33,6 @@ export default function TestCaseDetail({
   const [deleting, setDeleting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string>("");
-  const [isStepFormOpen, setIsStepFormOpen] = useState(false);
-  const [selectedStep, setSelectedStep] = useState<TestStep | null>(null);
-  const [key, setKey] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -103,17 +89,6 @@ export default function TestCaseDetail({
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
-  };
-
-  const handleStepSelect = (step: TestStep) => {
-    setSelectedStep(step);
-    setIsStepFormOpen(true);
-  };
-
-  const handleStepFormSuccess = () => {
-    setIsStepFormOpen(false);
-    setSelectedStep(null);
-    setKey((prev) => prev + 1);
   };
 
   const handleGenerateCode = async () => {
@@ -263,29 +238,6 @@ export default function TestCaseDetail({
         </div>
       </div>
 
-      {/* テストステップ一覧 */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-6 space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-gray-900">
-              テストステップ
-            </h2>
-            <button
-              onClick={() => setIsStepFormOpen(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              ステップを追加
-            </button>
-          </div>
-
-          <TestStepList
-            key={key}
-            testCaseId={`${params.id}/${params.testCaseId}`}
-            onStepSelect={handleStepSelect}
-          />
-        </div>
-      </div>
-
       {/* テストステップグリッド */}
       <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">
@@ -373,63 +325,6 @@ export default function TestCaseDetail({
                     {deleting ? "削除中..." : "削除"}
                   </button>
                 </div>
-              </div>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* テストステップフォームモーダル */}
-      <Transition appear show={isStepFormOpen} as={Fragment}>
-        <Dialog
-          as="div"
-          className="fixed inset-0 z-10 overflow-y-auto"
-          onClose={() => setIsStepFormOpen(false)}
-        >
-          <div className="min-h-screen px-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <div className="fixed inset-0 bg-black bg-opacity-30" />
-            </Transition.Child>
-
-            <span
-              className="inline-block h-screen align-middle"
-              aria-hidden="true"
-            >
-              &#8203;
-            </span>
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
-                <Dialog.Title
-                  as="h3"
-                  className="text-lg font-medium leading-6 text-gray-900 mb-4"
-                >
-                  {selectedStep
-                    ? "テストステップの編集"
-                    : "テストステップの追加"}
-                </Dialog.Title>
-
-                <TestStepForm
-                  testCaseId={`${params.id}/${params.testCaseId}`}
-                  stepId={selectedStep?.id}
-                  onSuccess={handleStepFormSuccess}
-                  onCancel={() => setIsStepFormOpen(false)}
-                />
               </div>
             </Transition.Child>
           </div>

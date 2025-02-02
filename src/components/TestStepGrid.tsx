@@ -1,8 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { DataGrid, GridColDef } from "@mui/x-data-grid";
-import { Select, MenuItem, TextField } from "@mui/material";
+import {
+  DataGrid,
+  GridColDef,
+  GridActionsCellItem,
+  GridRowModel,
+  GridRowModes,
+  GridRowModesModel,
+  GridToolbarContainer,
+} from "@mui/x-data-grid";
+import {
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
+import AddIcon from "@mui/icons-material/Add";
 
 interface TestStep {
   id: number;
@@ -35,6 +54,16 @@ interface TestStepGridProps {
   onStepUpdate?: (step: TestStep) => void;
 }
 
+function EditToolbar(props: { onAdd: () => void }) {
+  return (
+    <GridToolbarContainer>
+      <Button color="primary" startIcon={<AddIcon />} onClick={props.onAdd}>
+        新規ステップ追加
+      </Button>
+    </GridToolbarContainer>
+  );
+}
+
 export default function TestStepGrid({
   testCaseId,
   onStepUpdate,
@@ -43,6 +72,9 @@ export default function TestStepGrid({
   const [actionTypes, setActionTypes] = useState<ActionType[]>([]);
   const [selectors, setSelectors] = useState<Selector[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [stepToDelete, setStepToDelete] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,21 +105,50 @@ export default function TestStepGrid({
     fetchData();
   }, [testCaseId]);
 
-  const handleCellEdit = async (params: any) => {
-    const updatedStep = {
-      ...steps.find((step) => step.id === params.id),
-      [params.field]: params.value,
-    };
+  const handleRowEditStart = (params: any) => {
+    setRowModesModel({
+      ...rowModesModel,
+      [params.id]: { mode: GridRowModes.Edit },
+    });
+  };
 
+  const handleRowEditStop = (params: any) => {
+    setRowModesModel({
+      ...rowModesModel,
+      [params.id]: { mode: GridRowModes.View },
+    });
+  };
+
+  const handleEditClick = (id: number) => () => {
+    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
+  };
+
+  const handleSaveClick = (id: number) => () => {
+    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
+  };
+
+  const handleCancelClick = (id: number) => () => {
+    setRowModesModel({
+      ...rowModesModel,
+      [id]: { mode: GridRowModes.View, ignoreModifications: true },
+    });
+  };
+
+  const handleDeleteClick = (id: number) => () => {
+    setStepToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const processRowUpdate = async (newRow: GridRowModel) => {
     try {
       const response = await fetch(
-        `/api/test-cases/${testCaseId}/steps/${params.id}`,
+        `/api/test-cases/${testCaseId}/steps/${newRow.id}`,
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(updatedStep),
+          body: JSON.stringify(newRow),
         }
       );
 
@@ -95,15 +156,71 @@ export default function TestStepGrid({
         throw new Error("ステップの更新に失敗しました");
       }
 
-      setSteps(
-        steps.map((step) => (step.id === params.id ? updatedStep : step))
-      );
-
-      if (onStepUpdate) {
-        onStepUpdate(updatedStep);
-      }
+      const updatedRow = { ...newRow, isNew: false };
+      setSteps(steps.map((row) => (row.id === newRow.id ? updatedRow : row)));
+      return updatedRow;
     } catch (error) {
       console.error("更新エラー:", error);
+      throw error;
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (stepToDelete === null) return;
+
+    try {
+      const response = await fetch(
+        `/api/test-cases/${testCaseId}/steps/${stepToDelete}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("ステップの削除に失敗しました");
+      }
+
+      setSteps(steps.filter((step) => step.id !== stepToDelete));
+    } catch (error) {
+      console.error("削除エラー:", error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setStepToDelete(null);
+    }
+  };
+
+  const handleAddClick = async () => {
+    const newStep = {
+      action_type_id: actionTypes[0].id,
+      selector_id: null,
+      input_value: null,
+      assertion_value: null,
+      description: null,
+      order_index: steps.length + 1,
+    };
+
+    try {
+      const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newStep),
+      });
+
+      if (!response.ok) {
+        throw new Error("ステップの作成に失敗しました");
+      }
+
+      const data = await response.json();
+      const createdStep = { ...newStep, id: data.id };
+      setSteps([...steps, createdStep]);
+      setRowModesModel({
+        ...rowModesModel,
+        [data.id]: { mode: GridRowModes.Edit },
+      });
+    } catch (error) {
+      console.error("作成エラー:", error);
     }
   };
 
@@ -163,6 +280,53 @@ export default function TestStepGrid({
       width: 200,
       editable: true,
     },
+    {
+      field: "actions",
+      type: "actions",
+      headerName: "操作",
+      width: 100,
+      cellClassName: "actions",
+      getActions: ({ id }) => {
+        const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
+
+        if (isInEditMode) {
+          return [
+            <GridActionsCellItem
+              key="save"
+              icon={<SaveIcon />}
+              label="保存"
+              onClick={handleSaveClick(id as number)}
+            />,
+            <GridActionsCellItem
+              key="cancel"
+              icon={<CancelIcon />}
+              label="キャンセル"
+              className="textPrimary"
+              onClick={handleCancelClick(id as number)}
+              color="inherit"
+            />,
+          ];
+        }
+
+        return [
+          <GridActionsCellItem
+            key="edit"
+            icon={<EditIcon />}
+            label="編集"
+            className="textPrimary"
+            onClick={handleEditClick(id as number)}
+            color="inherit"
+          />,
+          <GridActionsCellItem
+            key="delete"
+            icon={<DeleteIcon />}
+            label="削除"
+            onClick={handleDeleteClick(id as number)}
+            color="inherit"
+          />,
+        ];
+      },
+    },
   ];
 
   if (loading) {
@@ -170,16 +334,38 @@ export default function TestStepGrid({
   }
 
   return (
-    <div style={{ height: 400, width: "100%" }}>
+    <div className="h-[600px] w-full">
       <DataGrid
         rows={steps}
         columns={columns}
-        pageSize={5}
-        rowsPerPageOptions={[5]}
-        checkboxSelection
-        disableSelectionOnClick
-        onCellEditCommit={handleCellEdit}
+        editMode="row"
+        rowModesModel={rowModesModel}
+        onRowModesModelChange={(newModel) => setRowModesModel(newModel)}
+        onRowEditStart={handleRowEditStart}
+        onRowEditStop={handleRowEditStop}
+        processRowUpdate={processRowUpdate}
+        slots={{
+          toolbar: EditToolbar,
+        }}
+        slotProps={{
+          toolbar: { onAdd: handleAddClick },
+        }}
       />
+
+      {/* 削除確認ダイアログ */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>ステップの削除</DialogTitle>
+        <DialogContent>このステップを削除してもよろしいですか？</DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>キャンセル</Button>
+          <Button onClick={handleDeleteConfirm} color="error">
+            削除
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
