@@ -211,17 +211,20 @@ export default function TestStepGrid({
   };
 
   const handleRowOrderChange = async (params: GridRowOrderChangeParams) => {
-    const newSteps = [...steps];
-    const movedStep = newSteps.splice(params.oldIndex, 1)[0];
-    newSteps.splice(params.targetIndex, 0, movedStep);
-
-    // 順序を更新
-    const updatedSteps = newSteps.map((step, index) => ({
-      ...step,
-      order_index: index + 1,
-    }));
-
     try {
+      const newSteps = [...steps];
+      const movedStep = newSteps.splice(params.oldIndex, 1)[0];
+      newSteps.splice(params.targetIndex, 0, movedStep);
+
+      // 順序を更新
+      const updatedSteps = newSteps.map((step, index) => ({
+        ...step,
+        order_index: index + 1,
+      }));
+
+      // 一時的に新しい順序を反映
+      setSteps(updatedSteps);
+
       // 一括更新APIを呼び出し
       const response = await fetch(
         `/api/test-cases/${testCaseId}/steps/reorder`,
@@ -238,11 +241,18 @@ export default function TestStepGrid({
         throw new Error("ステップの順序更新に失敗しました");
       }
 
-      setSteps(updatedSteps);
+      // 成功した場合はAPIからの応答で更新
+      const result = await response.json();
+      if (Array.isArray(result)) {
+        setSteps(result);
+      }
     } catch (error) {
       console.error("順序更新エラー:", error);
       setError("ステップの順序更新に失敗しました");
-      setSteps(steps);
+      // エラー時は元の順序に戻す
+      const response = await fetch(`/api/test-cases/${testCaseId}/steps`);
+      const originalSteps = await response.json();
+      setSteps(originalSteps);
     }
   };
 
@@ -313,9 +323,15 @@ export default function TestStepGrid({
       headerName: "",
       width: 50,
       sortable: false,
+      filterable: false,
+      hideable: false,
+      disableColumnMenu: true,
+      disableReorder: true,
       renderCell: () => (
         <Tooltip title="ドラッグして順序を変更">
-          <DragIndicatorIcon />
+          <div className="flex items-center justify-center w-full h-full cursor-move">
+            <DragIndicatorIcon />
+          </div>
         </Tooltip>
       ),
     },
@@ -456,6 +472,16 @@ export default function TestStepGrid({
           toolbar: { onAdd: handleAddClick },
         }}
         apiRef={apiRef}
+        disableRowSelectionOnClick
+        getRowClassName={() => "cursor-move"}
+        sx={{
+          "& .MuiDataGrid-row": {
+            cursor: "move",
+          },
+          "& .MuiDataGrid-cell:focus": {
+            outline: "none",
+          },
+        }}
       />
 
       {/* 削除確認ダイアログ */}
