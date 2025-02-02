@@ -5,30 +5,39 @@ import { join, dirname } from 'path';
 
 let database: sqlite3.Database | null = null;
 
+export async function getDatabase() {
+  return Promise.race([
+    initializeDatabase(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
+    )
+  ]) as Promise<sqlite3.Database>;
+}
+
 export async function initializeDatabase() {
-    if (database) {
-        return database;
+  if (database) {
+    return database;
+  }
+
+  const dbPath = process.env.DATABASE_PATH || join(process.cwd(), 'data', 'test.db');
+
+  // データベースディレクトリの作成
+  try {
+    await mkdir(dirname(dbPath), { recursive: true });
+  } catch (error) {
+    // ディレクトリが既に存在する場合は無視
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw error;
     }
+  }
 
-    const dbPath = process.env.DATABASE_PATH || join(process.cwd(), 'data', 'test.db');
+  const db = await open({
+    filename: dbPath,
+    driver: sqlite3.Database
+  });
 
-    // データベースディレクトリの作成
-    try {
-        await mkdir(dirname(dbPath), { recursive: true });
-    } catch (error) {
-        // ディレクトリが既に存在する場合は無視
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-            throw error;
-        }
-    }
-
-    const db = await open({
-        filename: dbPath,
-        driver: sqlite3.Database
-    });
-
-    // pagesテーブルの作成
-    await db.exec(`
+  // pagesテーブルの作成
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS pages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -40,8 +49,8 @@ export async function initializeDatabase() {
     )
   `);
 
-    // セレクタテーブルの作成
-    await db.exec(`
+  // セレクタテーブルの作成
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS selectors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       page_id INTEGER NOT NULL,
@@ -58,13 +67,13 @@ export async function initializeDatabase() {
     )
   `);
 
-    database = db as unknown as sqlite3.Database;
-    return database;
+  database = db as unknown as sqlite3.Database;
+  return database;
 }
 
 export function getDatabase() {
-    if (!database) {
-        throw new Error('データベースが初期化されていません');
-    }
-    return database;
+  if (!database) {
+    throw new Error('データベースが初期化されていません');
+  }
+  return database;
 } 

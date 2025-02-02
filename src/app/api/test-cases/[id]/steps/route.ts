@@ -2,19 +2,56 @@ import { NextResponse } from "next/server";
 import { initializeDatabase } from "@/lib/db/init";
 import { Database } from "sqlite";
 import sqlite3 from "sqlite3";
+import { createErrorResponse, createSuccessResponse } from "@/lib/api";
 
+// データベース接続を取得する共通関数
+async function getDatabase(): Promise<Database<sqlite3.Database>> {
+    return Promise.race([
+        initializeDatabase(),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("データベース接続がタイムアウトしました")), 5000)
+        ),
+    ]) as Promise<Database<sqlite3.Database>>;
+}
+
+// ステップデータを取得する共通関数
+async function getStepData(db: Database<sqlite3.Database>, stepId: number | undefined) {
+    if (typeof stepId !== 'number') {
+        throw new Error("ステップIDが無効です");
+    }
+    return db.get(
+        `SELECT 
+            ts.id,
+            ts.test_case_id,
+            ts.action_type_id,
+            at.name as action_type,
+            at.has_value,
+            at.has_selector,
+            at.has_assertion,
+            ts.selector_id,
+            s.name as selector_name,
+            s.selector_type,
+            s.selector_value,
+            ts.input_value,
+            ts.assertion_value,
+            ts.description,
+            ts.order_index
+        FROM test_steps ts
+        LEFT JOIN action_types at ON ts.action_type_id = at.id
+        LEFT JOIN selectors s ON ts.selector_id = s.id
+        WHERE ts.id = ?`,
+        [stepId]
+    );
+}
+プロジェクト全体を再帰的に解析してください。
+必要な改善点や問題があれば提示し修正を行ってください。
 // テストステップ一覧の取得
 export async function GET(
     request: Request,
     { params }: { params: { id: string } }
 ) {
     try {
-        const db = await Promise.race([
-            initializeDatabase(),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("データベース接続がタイムアウトしました")), 5000)
-            ),
-        ]) as Database<sqlite3.Database>;
+        const db = await getDatabase();
 
         // テストケースの存在確認
         const testCase = await db.get(
@@ -23,15 +60,13 @@ export async function GET(
         );
 
         if (!testCase) {
-            return NextResponse.json(
-                { error: "テストケースが見つかりません" },
-                { status: 404 }
-            );
+            return createErrorResponse(new Error("テストケースが見つかりません"), 404);
         }
 
         const steps = await db.all(
             `SELECT 
                 ts.id,
+                ts.test_case_id,
                 ts.action_type_id,
                 at.name as action_type,
                 at.has_value,
@@ -61,13 +96,9 @@ export async function GET(
             description: step.description || "",
         }));
 
-        return NextResponse.json(formattedSteps);
+        return createSuccessResponse(formattedSteps);
     } catch (error) {
-        console.error("データベース操作エラー:", error);
-        return NextResponse.json(
-            { error: error instanceof Error ? error.message : "テストステップの取得に失敗しました" },
-            { status: 500 }
-        );
+        return createErrorResponse(error);
     }
 }
 
@@ -76,29 +107,23 @@ export async function POST(
     request: Request,
     { params }: { params: { id: string } }
 ) {
+    const db = await getDatabase();
+    await db.run("BEGIN TRANSACTION");
+
     try {
         const {
             action_type_id,
             selector_id,
-            input_value = "",  // デフォルト値を空文字列に設定
-            assertion_value = "",  // デフォルト値を空文字列に設定
-            description = "",  // デフォルト値を空文字列に設定
+            input_value = "",
+            assertion_value = "",
+            description = "",
             order_index,
         } = await request.json();
 
         if (!action_type_id || order_index === undefined) {
-            return NextResponse.json(
-                { error: "アクションタイプと順序は必須です" },
-                { status: 400 }
-            );
+            await db.run("ROLLBACK");
+            return createErrorResponse(new Error("アクションタイプと順序は必須です"), 400);
         }
-
-        const db = await Promise.race([
-            initializeDatabase(),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("データベース接続がタイムアウトしました")), 5000)
-            ),
-        ]) as Database<sqlite3.Database>;
 
         // テストケースの存在確認
         const testCase = await db.get(
@@ -107,10 +132,8 @@ export async function POST(
         );
 
         if (!testCase) {
-            return NextResponse.json(
-                { error: "テストケースが見つかりません" },
-                { status: 404 }
-            );
+            await db.run("ROLLBACK");
+            return createErrorResponse(new Error("テストケースが見つかりません"), 404);
         }
 
         // アクションタイプの存在確認
@@ -120,10 +143,8 @@ export async function POST(
         );
 
         if (!actionType) {
-            return NextResponse.json(
-                { error: "指定されたアクションタイプが見つかりません" },
-                { status: 400 }
-            );
+            await db.run("ROLLBACK");
+            return createErrorResponse(new Error("指定されたアクションタイプが見つかりません"), 400);
         }
 
         // セレクタの存在確認（セレクタIDが指定されている場合）
@@ -134,10 +155,8 @@ export async function POST(
             );
 
             if (!selector) {
-                return NextResponse.json(
-                    { error: "指定されたセレクタが見つかりません" },
-                    { status: 400 }
-                );
+                await db.run("ROLLBACK");
+                return createErrorResponse(new Error("指定されたセレクタが見つかりません"), 400);
             }
         }
 
@@ -162,13 +181,14 @@ export async function POST(
             ]
         );
 
-        return NextResponse.json({ id: result.lastID }, { status: 201 });
+        // 作成されたステップの完全なデータを取得
+        const createdStep = await getStepData(db, result.lastID);
+
+        await db.run("COMMIT");
+        return createSuccessResponse(createdStep, 201);
     } catch (error) {
-        console.error("データベース操作エラー:", error);
-        return NextResponse.json(
-            { error: error instanceof Error ? error.message : "テストステップの作成に失敗しました" },
-            { status: 500 }
-        );
+        await db.run("ROLLBACK");
+        return createErrorResponse(error);
     }
 }
 
@@ -177,44 +197,54 @@ export async function PUT(
     request: Request,
     { params }: { params: { id: string } }
 ) {
+    const db = await getDatabase();
+    await db.run("BEGIN TRANSACTION");
+
     try {
         const steps = await request.json();
 
         if (!Array.isArray(steps)) {
-            return NextResponse.json(
-                { error: "無効なデータ形式です" },
-                { status: 400 }
+            await db.run("ROLLBACK");
+            return createErrorResponse(new Error("無効なデータ形式です"), 400);
+        }
+
+        for (const { id, order_index } of steps) {
+            await db.run(
+                "UPDATE test_steps SET order_index = ? WHERE id = ? AND test_case_id = ?",
+                [order_index, id, params.id]
             );
         }
 
-        const db = await Promise.race([
-            initializeDatabase(),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("データベース接続がタイムアウトしました")), 5000)
-            ),
-        ]) as Database<sqlite3.Database>;
-
-        await db.run("BEGIN TRANSACTION");
-
-        try {
-            for (const { id, order_index } of steps) {
-                await db.run(
-                    "UPDATE test_steps SET order_index = ? WHERE id = ? AND test_case_id = ?",
-                    [order_index, id, params.id]
-                );
-            }
-
-            await db.run("COMMIT");
-            return NextResponse.json({ message: "テストステップの順序を更新しました" });
-        } catch (error) {
-            await db.run("ROLLBACK");
-            throw error;
-        }
-    } catch (error) {
-        console.error("データベース操作エラー:", error);
-        return NextResponse.json(
-            { error: error instanceof Error ? error.message : "テストステップの更新に失敗しました" },
-            { status: 500 }
+        // 更新後のステップ一覧を取得
+        const updatedSteps = await db.all(
+            `SELECT 
+                ts.id,
+                ts.test_case_id,
+                ts.action_type_id,
+                at.name as action_type,
+                at.has_value,
+                at.has_selector,
+                at.has_assertion,
+                ts.selector_id,
+                s.name as selector_name,
+                s.selector_type,
+                s.selector_value,
+                ts.input_value,
+                ts.assertion_value,
+                ts.description,
+                ts.order_index
+            FROM test_steps ts
+            LEFT JOIN action_types at ON ts.action_type_id = at.id
+            LEFT JOIN selectors s ON ts.selector_id = s.id
+            WHERE ts.test_case_id = ?
+            ORDER BY ts.order_index ASC`,
+            [params.id]
         );
+
+        await db.run("COMMIT");
+        return createSuccessResponse(updatedSteps);
+    } catch (error) {
+        await db.run("ROLLBACK");
+        return createErrorResponse(error);
     }
 } 
