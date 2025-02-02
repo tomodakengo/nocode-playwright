@@ -223,47 +223,65 @@ export default function TestStepGrid({
 
   const handleRowOrderChange = async (params: GridRowOrderChangeParams) => {
     try {
-      const newSteps = [...steps];
-      const movedStep = newSteps.splice(params.oldIndex, 1)[0];
-      newSteps.splice(params.targetIndex, 0, movedStep);
+      const newOrder = params.targetIndex;
+      const stepId = params.row.id;
 
-      // 順序を更新
-      const updatedSteps = newSteps.map((step, index) => ({
+      // 新しい順序でステップを並び替え
+      const updatedSteps = [...steps];
+      const oldIndex = steps.findIndex((step) => step.id === stepId);
+      const [movedStep] = updatedSteps.splice(oldIndex, 1);
+      updatedSteps.splice(newOrder, 0, movedStep);
+
+      // order_indexを更新
+      const reorderedSteps = updatedSteps.map((step, index) => ({
         ...step,
         order_index: index + 1,
       }));
 
       // 一時的に新しい順序を反映
-      setSteps(updatedSteps);
+      setSteps(reorderedSteps);
 
-      // 一括更新APIを呼び出し
+      // バルク更新APIを呼び出し
       const response = await fetch(
-        `/api/test-cases/${testCaseId}/steps/reorder`,
+        `/api/test-cases/${testCaseId}/steps/bulk-update`,
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(updatedSteps),
+          body: JSON.stringify({
+            steps: reorderedSteps.map((step) => ({
+              id: step.id,
+              order_index: step.order_index,
+            })),
+          }),
         }
       );
 
       if (!response.ok) {
-        throw new Error("ステップの順序更新に失敗しました");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "順序の更新に失敗しました");
       }
 
-      // 成功した場合はAPIからの応答で更新
-      const result = await response.json();
-      if (Array.isArray(result)) {
-        setSteps(result);
+      const updatedData = await response.json();
+      setSteps(updatedData);
+
+      // 更新成功時、親コンポーネントに通知
+      if (onStepUpdate) {
+        onStepUpdate(updatedData);
       }
     } catch (error) {
-      console.error("順序更新エラー:", error);
-      setError("ステップの順序更新に失敗しました");
-      // エラー時は元の順序に戻す
-      const response = await fetch(`/api/test-cases/${testCaseId}/steps`);
-      const originalSteps = await response.json();
-      setSteps(originalSteps);
+      console.error("順序の更新エラー:", error);
+      setError(
+        error instanceof Error ? error.message : "順序の更新に失敗しました"
+      );
+
+      // エラー時は元の順序を復元するため、ステップを再取得
+      const stepsResponse = await fetch(`/api/test-cases/${testCaseId}/steps`);
+      if (stepsResponse.ok) {
+        const stepsData = await stepsResponse.json();
+        setSteps(stepsData);
+      }
     }
   };
 
@@ -293,16 +311,17 @@ export default function TestStepGrid({
   };
 
   const handleAddClick = async () => {
-    const newStep = {
-      action_type_id: actionTypes[0].id,
-      selector_id: null,
-      input_value: "",
-      assertion_value: "",
-      description: "",
-      order_index: steps.length + 1,
-    };
-
     try {
+      const newStep = {
+        test_case_id: testCaseId,
+        action_type_id: actionTypes[0]?.id || "",
+        selector_id: "",
+        input_value: "",
+        assertion_value: "",
+        description: "",
+        order_index: steps.length + 1,
+      };
+
       const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
         method: "POST",
         headers: {
@@ -312,19 +331,31 @@ export default function TestStepGrid({
       });
 
       if (!response.ok) {
-        throw new Error("ステップの作成に失敗しました");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "ステップの作成に失敗しました");
       }
 
-      const data = await response.json();
-      const createdStep = { ...newStep, id: data.id };
-      setSteps([...steps, createdStep]);
+      const createdStep = await response.json();
+
+      // ステップリストを更新
+      const updatedSteps = [...steps, createdStep];
+      setSteps(updatedSteps);
+
+      // 編集モードを設定
       setRowModesModel({
         ...rowModesModel,
-        [data.id]: { mode: GridRowModes.Edit },
+        [createdStep.id]: { mode: GridRowModes.Edit },
       });
+
+      // 親コンポーネントに通知
+      if (onStepUpdate) {
+        onStepUpdate(updatedSteps);
+      }
     } catch (error) {
       console.error("作成エラー:", error);
-      setError("ステップの作成に失敗しました");
+      setError(
+        error instanceof Error ? error.message : "ステップの作成に失敗しました"
+      );
     }
   };
 
@@ -376,6 +407,7 @@ export default function TestStepGrid({
           </Tooltip>
         );
       },
+      valueFormatter: (params) => params.value || "",
     },
     {
       field: "selector_id",
@@ -391,7 +423,11 @@ export default function TestStepGrid({
         const selector = selectors.find((s) => s.id === params.value);
         return selector ? `${selector.name} (${selector.selector_value})` : "";
       },
-      valueFormatter: (params) => params.value || null,
+      valueFormatter: (params) => params.value || "",
+      preProcessEditCellProps: (params) => ({
+        ...params.props,
+        value: params.props.value || "",
+      }),
     },
     {
       field: "input_value",
@@ -496,6 +532,10 @@ export default function TestStepGrid({
           },
           "& .MuiDataGrid-cell:focus": {
             outline: "none",
+          },
+          "& .MuiDataGrid-row--dragging": {
+            backgroundColor: "grey.200",
+            opacity: 0.5,
           },
         }}
         initialState={{
