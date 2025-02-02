@@ -51,9 +51,9 @@ export default function TestStepGrid({
 
   const handleUpdate = async (step: TestStep) => {
     try {
-      // バリデーション
-      if (!step.action_type_id) {
-        setError("アクションタイプを選択してください");
+      const errors = validateTestStep(step);
+      if (errors.length > 0) {
+        setError(formatValidationErrors(errors));
         return;
       }
 
@@ -67,13 +67,13 @@ export default function TestStepGrid({
 
       // 更新用のデータを整形
       const updateData = {
-        test_case_id: Number(testCaseId),
-        action_type_id: Number(step.action_type_id),
-        selector_id: step.selector_id ? Number(step.selector_id) : null,
-        input_value: step.input_value || "",
-        assertion_value: step.assertion_value || "",
-        description: step.description || "",
-        order_index: Number(step.order_index),
+        test_case_id: ensureNumber(testCaseId),
+        action_type_id: ensureNumber(step.action_type_id),
+        selector_id: ensureNumber(step.selector_id),
+        input_value: ensureString(step.input_value),
+        assertion_value: ensureString(step.assertion_value),
+        description: ensureString(step.description),
+        order_index: ensureNumber(step.order_index),
       };
 
       const response = await fetch(
@@ -88,20 +88,7 @@ export default function TestStepGrid({
         }
       );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          await refreshSteps();
-          throw new Error("ステップが削除されたため、データを更新しました");
-        }
-
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.message ||
-            `更新に失敗しました (${response.status}): ${errorData?.error || ""}`
-        );
-      }
-
-      const updatedStep = await response.json();
+      const updatedStep = await handleApiResponse<TestStep>(response);
       const updatedSteps = steps.map((s) =>
         s.id === step.id ? updatedStep : s
       );
@@ -151,16 +138,14 @@ export default function TestStepGrid({
       );
 
       const newStep = {
-        test_case_id: Number(testCaseId), // 数値型に変換
-        action_type_id: Number(actionTypes[0]?.id),
+        test_case_id: ensureNumber(testCaseId),
+        action_type_id: ensureNumber(actionTypes[0]?.id),
         selector_id: null,
         input_value: "",
         assertion_value: "",
         description: "",
         order_index: maxOrderIndex + 1,
       };
-
-      console.log("新規ステップデータ:", newStep);
 
       const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
         method: "POST",
@@ -171,15 +156,7 @@ export default function TestStepGrid({
         body: JSON.stringify(newStep),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.message ||
-            `ステップの作成に失敗しました (${response.status})`
-        );
-      }
-
-      const createdStep = await response.json();
+      const createdStep = await handleApiResponse<TestStep>(response);
       const updatedSteps = [...steps, createdStep];
       setSteps(updatedSteps);
       setEditingId(createdStep.id);
@@ -193,10 +170,6 @@ export default function TestStepGrid({
           ? error.message
           : "ステップの作成中に予期せぬエラーが発生しました"
       );
-      // エラー後にステップを再取得
-      const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
-      const stepsData = await stepsRes.json();
-      setSteps(stepsData);
     }
   };
 
