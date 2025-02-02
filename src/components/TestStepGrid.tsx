@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { ActionType, Selector, TestStep } from "@/types";
+import {
+  validateTestStep,
+  formatValidationErrors,
+  ensureNumber,
+  ensureString,
+} from "@/lib/validation";
+import { handleApiResponse } from "@/lib/api";
 
 interface TestStepGridProps {
   testCaseId: number;
@@ -137,9 +144,9 @@ export default function TestStepGrid({
         0
       );
 
-      const newStep = {
-        test_case_id: ensureNumber(testCaseId),
-        action_type_id: ensureNumber(actionTypes[0]?.id),
+      const newStep: Partial<TestStep> = {
+        test_case_id: Number(testCaseId),
+        action_type_id: actionTypes[0]?.id,
         selector_id: null,
         input_value: "",
         assertion_value: "",
@@ -157,9 +164,14 @@ export default function TestStepGrid({
       });
 
       const createdStep = await handleApiResponse<TestStep>(response);
-      const updatedSteps = [...steps, createdStep];
+      // 作成されたステップのorder_indexを確実に設定
+      const updatedStep = {
+        ...createdStep,
+        order_index: maxOrderIndex + 1,
+      };
+      const updatedSteps = [...steps, updatedStep];
       setSteps(updatedSteps);
-      setEditingId(createdStep.id);
+      setEditingId(updatedStep.id);
       if (onStepUpdate) {
         onStepUpdate(updatedSteps);
       }
