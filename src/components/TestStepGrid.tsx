@@ -56,6 +56,50 @@ export default function TestStepGrid({
     fetchData();
   }, [testCaseId]);
 
+  const handleSave = async (step: TestStep) => {
+    try {
+      const errors = validateTestStep(step);
+      if (errors.length > 0) {
+        setError(formatValidationErrors(errors));
+        return;
+      }
+
+      // データを整形
+      const stepData = {
+        test_case_id: ensureNumber(testCaseId),
+        action_type_id: ensureNumber(step.action_type_id),
+        selector_id: ensureNumber(step.selector_id),
+        input_value: ensureString(step.input_value),
+        assertion_value: ensureString(step.assertion_value),
+        description: ensureString(step.description),
+        order_index: ensureNumber(step.order_index),
+      };
+
+      // 新規作成の場合はPOSTメソッドを使用
+      const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(stepData),
+      });
+
+      const createdStep = await handleApiResponse<TestStep>(response);
+      const updatedSteps = steps.map((s) => (s.id === -1 ? createdStep : s));
+      setSteps(updatedSteps);
+      setEditingId(null);
+      if (onStepUpdate) {
+        onStepUpdate(updatedSteps);
+      }
+    } catch (error) {
+      console.error("ステップ作成エラー:", error);
+      setError(
+        error instanceof Error ? error.message : "ステップの作成に失敗しました"
+      );
+    }
+  };
+
   const handleUpdate = async (step: TestStep) => {
     try {
       const errors = validateTestStep(step);
@@ -64,16 +108,8 @@ export default function TestStepGrid({
         return;
       }
 
-      // 現在のステップが配列内に存在するか確認
-      if (!steps.some((s) => s.id === step.id)) {
-        await refreshSteps();
-        setError("ステップが存在しないため、データを更新しました");
-        setEditingId(null);
-        return;
-      }
-
-      // 更新用のデータを整形
-      const updateData = {
+      // データを整形
+      const stepData = {
         test_case_id: ensureNumber(testCaseId),
         action_type_id: ensureNumber(step.action_type_id),
         selector_id: ensureNumber(step.selector_id),
@@ -91,7 +127,7 @@ export default function TestStepGrid({
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          body: JSON.stringify(updateData),
+          body: JSON.stringify(stepData),
         }
       );
 
@@ -144,7 +180,9 @@ export default function TestStepGrid({
         0
       );
 
-      const newStep: Partial<TestStep> = {
+      // 新規ステップを作成（仮のIDを設定）
+      const tempStep: TestStep = {
+        id: -1, // 仮のID
         test_case_id: Number(testCaseId),
         action_type_id: actionTypes[0]?.id,
         selector_id: null,
@@ -154,27 +192,9 @@ export default function TestStepGrid({
         order_index: maxOrderIndex + 1,
       };
 
-      const response = await fetch(`/api/test-cases/${testCaseId}/steps`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(newStep),
-      });
-
-      const createdStep = await handleApiResponse<TestStep>(response);
-      // 作成されたステップのorder_indexを確実に設定
-      const updatedStep = {
-        ...createdStep,
-        order_index: maxOrderIndex + 1,
-      };
-      const updatedSteps = [...steps, updatedStep];
-      setSteps(updatedSteps);
-      setEditingId(updatedStep.id);
-      if (onStepUpdate) {
-        onStepUpdate(updatedSteps);
-      }
+      // 編集モードで新規ステップを追加
+      setSteps([...steps, tempStep]);
+      setEditingId(tempStep.id);
     } catch (error) {
       console.error("ステップ作成エラー:", error);
       setError(
@@ -413,13 +433,21 @@ export default function TestStepGrid({
                 </div>
                 <div className="col-span-1 flex gap-2">
                   <button
-                    onClick={() => handleUpdate(step)}
+                    onClick={() =>
+                      step.id === -1 ? handleSave(step) : handleUpdate(step)
+                    }
                     className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
                   >
                     保存
                   </button>
                   <button
-                    onClick={() => setEditingId(null)}
+                    onClick={() => {
+                      if (step.id === -1) {
+                        // 新規作成をキャンセルする場合は、ステップを削除
+                        setSteps(steps.filter((s) => s.id !== -1));
+                      }
+                      setEditingId(null);
+                    }}
                     className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
                   >
                     キャンセル
