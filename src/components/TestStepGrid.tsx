@@ -57,17 +57,10 @@ export default function TestStepGrid({
         return;
       }
 
-      // ステップが存在することを確認
-      const checkResponse = await fetch(
-        `/api/test-cases/${testCaseId}/steps/${step.id}`
-      );
-
-      if (!checkResponse.ok) {
-        // ステップが見つからない場合、最新のデータを再取得
-        const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
-        const stepsData = await stepsRes.json();
-        setSteps(stepsData);
-        setError("ステップが見つかりません。データを更新しました。");
+      // 現在のステップが配列内に存在するか確認
+      if (!steps.some((s) => s.id === step.id)) {
+        await refreshSteps();
+        setError("ステップが存在しないため、データを更新しました");
         setEditingId(null);
         return;
       }
@@ -83,8 +76,6 @@ export default function TestStepGrid({
         order_index: Number(step.order_index),
       };
 
-      console.log("更新データ:", updateData);
-
       const response = await fetch(
         `/api/test-cases/${testCaseId}/steps/${step.id}`,
         {
@@ -98,8 +89,12 @@ export default function TestStepGrid({
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          await refreshSteps();
+          throw new Error("ステップが削除されたため、データを更新しました");
+        }
+
         const errorData = await response.json().catch(() => null);
-        console.error("サーバーエラーレスポンス:", errorData);
         throw new Error(
           errorData?.message ||
             `更新に失敗しました (${response.status}): ${errorData?.error || ""}`
@@ -122,18 +117,22 @@ export default function TestStepGrid({
           ? error.message
           : "ステップの更新中に予期せぬエラーが発生しました"
       );
+    }
+  };
 
-      // エラー後にステップを再取得
-      try {
-        const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
-        if (stepsRes.ok) {
-          const stepsData = await stepsRes.json();
-          setSteps(stepsData);
-          setEditingId(null);
-        }
-      } catch (fetchError) {
-        console.error("ステップの再取得に失敗:", fetchError);
+  // ステップデータを再取得する共通関数
+  const refreshSteps = async () => {
+    try {
+      const stepsRes = await fetch(`/api/test-cases/${testCaseId}/steps`);
+      if (stepsRes.ok) {
+        const stepsData = await stepsRes.json();
+        setSteps(stepsData);
+        return stepsData;
       }
+      return null;
+    } catch (error) {
+      console.error("ステップの再取得に失敗:", error);
+      return null;
     }
   };
 
