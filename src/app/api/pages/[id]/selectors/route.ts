@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { initializeDatabase } from '@/lib/db';
-import { Database } from 'sqlite3';
+import { Database } from 'sqlite';
+import sqlite3 from 'sqlite3';
 
 // セレクタ一覧の取得
 export async function GET(
@@ -13,7 +14,7 @@ export async function GET(
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
             )
-        ]) as Database<sqlite3.Database>;
+        ]) as Database;
 
         // ページの存在確認
         const page = await db.get(
@@ -30,7 +31,7 @@ export async function GET(
 
         const selectors = await db.all(
             'SELECT * FROM selectors WHERE page_id = ? ORDER BY name',
-            [params.id]
+            [parseInt(params.id, 10)]  // 文字列から数値に変換
         );
 
         console.log('Fetched selectors:', selectors); // デバッグ用ログ
@@ -73,7 +74,7 @@ export async function POST(
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
             )
-        ]) as Database<sqlite3.Database>;
+        ]) as Database;
 
         // ページの存在確認
         const page = await db.get(

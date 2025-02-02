@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initializeDatabase } from '@/lib/db/init';
+import { initializeDatabase } from '@/lib/db';
 import { Database } from 'sqlite';
 import sqlite3 from 'sqlite3';
 
@@ -14,7 +14,7 @@ export async function GET(
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
             )
-        ]) as Database<sqlite3.Database>;
+        ]) as Database;
 
         const page = await db.get(
             `SELECT 

@@ -35,6 +35,8 @@ export default function NewPage() {
     setError(null);
 
     try {
+      console.log("Submitting form data:", formData);
+
       const response = await fetch("/api/pages", {
         method: "POST",
         headers: {
@@ -43,14 +45,16 @@ export default function NewPage() {
         body: JSON.stringify(formData),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || "ページの作成に失敗しました");
       }
 
-      const data = await response.json();
+      console.log("Created page:", data);
       router.push(`/pages/${data.id}`);
     } catch (err) {
+      console.error("Error creating page:", err);
       setError(
         err instanceof Error ? err.message : "予期せぬエラーが発生しました"
       );

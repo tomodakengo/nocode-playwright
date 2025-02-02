@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initializeDatabase } from '@/lib/db/init';
+import { initializeDatabase } from '@/lib/db';
 import { Database } from 'sqlite';
 import sqlite3 from 'sqlite3';
 
@@ -11,18 +11,17 @@ export async function GET() {
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
             )
-        ]) as Database<sqlite3.Database>;
+        ]) as Database;
 
         const pages = await db.all(`
             SELECT 
                 p.*,
-                COUNT(s.id) as selector_count
+                (SELECT COUNT(*) FROM selectors s WHERE s.page_id = p.id) as selector_count
             FROM pages p
-            LEFT JOIN selectors s ON p.id = s.page_id
-            GROUP BY p.id
             ORDER BY p.updated_at DESC
         `);
 
+        console.log('Fetched pages:', pages); // デバッグ用ログ
         return NextResponse.json(pages || []);
     } catch (error) {
         console.error('データベース操作エラー:', error);
@@ -50,7 +49,7 @@ export async function POST(request: Request) {
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('データベース接続がタイムアウトしました')), 5000)
             )
-        ]) as Database<sqlite3.Database>;
+        ]) as Database;
 
         // URLパターンの重複チェック
         const existingPage = await db.get(
@@ -71,7 +70,15 @@ export async function POST(request: Request) {
             [name, url_pattern, description]
         );
 
-        return NextResponse.json({ id: result.lastID }, { status: 201 });
+        console.log('Created page:', { id: result.lastID }); // デバッグ用ログ
+
+        // 作成したページの詳細を取得
+        const newPage = await db.get(
+            'SELECT * FROM pages WHERE id = ?',
+            [result.lastID]
+        );
+
+        return NextResponse.json(newPage, { status: 201 });
     } catch (error) {
         console.error('データベース操作エラー:', error);
         return NextResponse.json(
