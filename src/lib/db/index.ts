@@ -27,6 +27,19 @@ export async function initializeDatabase() {
         driver: sqlite3.Database
     });
 
+    // pagesテーブルの作成
+    await db.exec(`
+    CREATE TABLE IF NOT EXISTS pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      url_pattern TEXT NOT NULL,
+      description TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(name)
+    )
+  `);
+
     // セレクタテーブルの作成
     await db.exec(`
     CREATE TABLE IF NOT EXISTS selectors (
