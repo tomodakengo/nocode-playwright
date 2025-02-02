@@ -53,7 +53,15 @@ export async function GET(
             [params.id]
         );
 
-        return NextResponse.json(steps);
+        // nullを空文字列に変換
+        const formattedSteps = steps.map(step => ({
+            ...step,
+            input_value: step.input_value || "",
+            assertion_value: step.assertion_value || "",
+            description: step.description || "",
+        }));
+
+        return NextResponse.json(formattedSteps);
     } catch (error) {
         console.error("データベース操作エラー:", error);
         return NextResponse.json(
@@ -72,9 +80,9 @@ export async function POST(
         const {
             action_type_id,
             selector_id,
-            input_value,
-            assertion_value,
-            description,
+            input_value = "",  // デフォルト値を空文字列に設定
+            assertion_value = "",  // デフォルト値を空文字列に設定
+            description = "",  // デフォルト値を空文字列に設定
             order_index,
         } = await request.json();
 

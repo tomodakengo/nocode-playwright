@@ -9,6 +9,9 @@ import {
   GridRowModes,
   GridRowModesModel,
   GridToolbarContainer,
+  GridRowOrderChangeParams,
+  gridRowOrderStateSelector,
+  useGridApiRef,
 } from "@mui/x-data-grid";
 import {
   Button,
@@ -16,20 +19,24 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tooltip,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import AddIcon from "@mui/icons-material/Add";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 
 interface TestStep {
   id: number;
   action_type_id: number;
   selector_id: number | null;
-  input_value: string | null;
-  assertion_value: string | null;
-  description: string | null;
+  input_value: string;
+  assertion_value: string;
+  description: string;
   order_index: number;
 }
 
@@ -68,6 +75,7 @@ export default function TestStepGrid({
   testCaseId,
   onStepUpdate,
 }: TestStepGridProps) {
+  const apiRef = useGridApiRef();
   const [steps, setSteps] = useState<TestStep[]>([]);
   const [actionTypes, setActionTypes] = useState<ActionType[]>([]);
   const [selectors, setSelectors] = useState<Selector[]>([]);
@@ -75,6 +83,7 @@ export default function TestStepGrid({
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [stepToDelete, setStepToDelete] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -139,8 +148,41 @@ export default function TestStepGrid({
     setDeleteDialogOpen(true);
   };
 
+  const validateRow = (newRow: GridRowModel): boolean => {
+    const actionType = actionTypes.find(
+      (type) => type.id === newRow.action_type_id
+    );
+    if (!actionType) return false;
+
+    // セレクタが必要なアクションの場合、セレクタの選択を必須にする
+    if (actionType.has_selector && !newRow.selector_id) {
+      throw new Error("このアクションにはセレクタの選択が必要です");
+    }
+
+    // 入力値が必要なアクションの場合、入力値を必須にする
+    if (actionType.has_value && !newRow.input_value) {
+      throw new Error("このアクションには入力値が必要です");
+    }
+
+    // アサーションが必要なアクションの場合、検証値を必須にする
+    if (actionType.has_assertion && !newRow.assertion_value) {
+      throw new Error("このアクションには検証値が必要です");
+    }
+
+    return true;
+  };
+
+  const handleCloseError = () => {
+    setError(null);
+  };
+
   const processRowUpdate = async (newRow: GridRowModel) => {
     try {
+      // バリデーションチェック
+      if (!validateRow(newRow)) {
+        throw new Error("入力内容が不正です");
+      }
+
       const response = await fetch(
         `/api/test-cases/${testCaseId}/steps/${newRow.id}`,
         {
@@ -161,7 +203,46 @@ export default function TestStepGrid({
       return updatedRow;
     } catch (error) {
       console.error("更新エラー:", error);
+      setError(
+        error instanceof Error ? error.message : "更新中にエラーが発生しました"
+      );
       throw error;
+    }
+  };
+
+  const handleRowOrderChange = async (params: GridRowOrderChangeParams) => {
+    const newSteps = [...steps];
+    const movedStep = newSteps.splice(params.oldIndex, 1)[0];
+    newSteps.splice(params.targetIndex, 0, movedStep);
+
+    // 順序を更新
+    const updatedSteps = newSteps.map((step, index) => ({
+      ...step,
+      order_index: index + 1,
+    }));
+
+    try {
+      // 一括更新APIを呼び出し
+      const response = await fetch(
+        `/api/test-cases/${testCaseId}/steps/reorder`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedSteps),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("ステップの順序更新に失敗しました");
+      }
+
+      setSteps(updatedSteps);
+    } catch (error) {
+      console.error("順序更新エラー:", error);
+      setError("ステップの順序更新に失敗しました");
+      setSteps(steps);
     }
   };
 
@@ -183,6 +264,7 @@ export default function TestStepGrid({
       setSteps(steps.filter((step) => step.id !== stepToDelete));
     } catch (error) {
       console.error("削除エラー:", error);
+      setError("ステップの削除に失敗しました");
     } finally {
       setDeleteDialogOpen(false);
       setStepToDelete(null);
@@ -193,9 +275,9 @@ export default function TestStepGrid({
     const newStep = {
       action_type_id: actionTypes[0].id,
       selector_id: null,
-      input_value: null,
-      assertion_value: null,
-      description: null,
+      input_value: "",
+      assertion_value: "",
+      description: "",
       order_index: steps.length + 1,
     };
 
@@ -221,15 +303,27 @@ export default function TestStepGrid({
       });
     } catch (error) {
       console.error("作成エラー:", error);
+      setError("ステップの作成に失敗しました");
     }
   };
 
   const columns: GridColDef[] = [
     {
+      field: "drag_indicator",
+      headerName: "",
+      width: 50,
+      sortable: false,
+      renderCell: () => (
+        <Tooltip title="ドラッグして順序を変更">
+          <DragIndicatorIcon />
+        </Tooltip>
+      ),
+    },
+    {
       field: "order_index",
       headerName: "順序",
       width: 70,
-      editable: true,
+      editable: false,
       type: "number",
     },
     {
@@ -241,10 +335,15 @@ export default function TestStepGrid({
       valueOptions: actionTypes.map((type) => ({
         value: type.id,
         label: type.name,
+        description: type.description,
       })),
       renderCell: (params) => {
         const actionType = actionTypes.find((type) => type.id === params.value);
-        return actionType?.name || "";
+        return (
+          <Tooltip title={actionType?.description || ""}>
+            <span>{actionType?.name || ""}</span>
+          </Tooltip>
+        );
       },
     },
     {
@@ -261,24 +360,28 @@ export default function TestStepGrid({
         const selector = selectors.find((s) => s.id === params.value);
         return selector ? `${selector.name} (${selector.selector_value})` : "";
       },
+      valueFormatter: (params) => params.value || null,
     },
     {
       field: "input_value",
       headerName: "入力値",
       width: 150,
       editable: true,
+      valueFormatter: (params) => params.value || "",
     },
     {
       field: "assertion_value",
       headerName: "検証値",
       width: 150,
       editable: true,
+      valueFormatter: (params) => params.value || "",
     },
     {
       field: "description",
       headerName: "説明",
       width: 200,
       editable: true,
+      valueFormatter: (params) => params.value || "",
     },
     {
       field: "actions",
@@ -344,12 +447,15 @@ export default function TestStepGrid({
         onRowEditStart={handleRowEditStart}
         onRowEditStop={handleRowEditStop}
         processRowUpdate={processRowUpdate}
+        rowReordering
+        onRowOrderChange={handleRowOrderChange}
         slots={{
           toolbar: EditToolbar,
         }}
         slotProps={{
           toolbar: { onAdd: handleAddClick },
         }}
+        apiRef={apiRef}
       />
 
       {/* 削除確認ダイアログ */}
@@ -366,6 +472,18 @@ export default function TestStepGrid({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* エラーメッセージ表示 */}
+      <Snackbar
+        open={error !== null}
+        autoHideDuration={6000}
+        onClose={handleCloseError}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert onClose={handleCloseError} severity="error">
+          {error}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
