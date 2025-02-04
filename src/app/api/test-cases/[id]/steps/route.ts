@@ -43,43 +43,25 @@ async function getStepData(db: Database<sqlite3.Database>, stepId: number | unde
         [stepId]
     );
 }
-プロジェクト全体を再帰的に解析してください。
-必要な改善点や問題があれば提示し修正を行ってください。
+
 // テストステップ一覧の取得
 export async function GET(
     request: Request,
     { params }: { params: { id: string } }
 ) {
     try {
-        const db = await getDatabase();
-
-        // テストケースの存在確認
-        const testCase = await db.get(
-            "SELECT id FROM test_cases WHERE id = ?",
-            [params.id]
-        );
-
-        if (!testCase) {
-            return createErrorResponse(new Error("テストケースが見つかりません"), 404);
-        }
-
+        const db = await initializeDatabase();
+        
         const steps = await db.all(
             `SELECT 
-                ts.id,
-                ts.test_case_id,
-                ts.action_type_id,
+                ts.*,
                 at.name as action_type,
                 at.has_value,
                 at.has_selector,
                 at.has_assertion,
-                ts.selector_id,
                 s.name as selector_name,
                 s.selector_type,
-                s.selector_value,
-                ts.input_value,
-                ts.assertion_value,
-                ts.description,
-                ts.order_index
+                s.selector_value
             FROM test_steps ts
             LEFT JOIN action_types at ON ts.action_type_id = at.id
             LEFT JOIN selectors s ON ts.selector_id = s.id
@@ -88,17 +70,14 @@ export async function GET(
             [params.id]
         );
 
-        // nullを空文字列に変換
-        const formattedSteps = steps.map(step => ({
-            ...step,
-            input_value: step.input_value || "",
-            assertion_value: step.assertion_value || "",
-            description: step.description || "",
-        }));
-
-        return createSuccessResponse(formattedSteps);
+        // 必ず配列を返すようにする
+        return NextResponse.json(Array.isArray(steps) ? steps : []);
     } catch (error) {
-        return createErrorResponse(error);
+        console.error("データベース操作エラー:", error);
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : "ステップの取得に失敗しました" },
+            { status: 500 }
+        );
     }
 }
 

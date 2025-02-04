@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { initializeDatabase } from '@/lib/db';
+import { initializeDatabase } from '@/lib/db/init';
 import { Database } from 'sqlite3';
 
 // セレクタ一覧の取得

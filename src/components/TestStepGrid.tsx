@@ -36,18 +36,36 @@ export default function TestStepGrid({
           fetch(`/api/test-cases/${testCaseId}/steps`),
         ]);
 
+        // レスポンスのステータスコードを確認
+        if (!actionTypesRes.ok || !selectorsRes.ok || !stepsRes.ok) {
+          throw new Error("データの取得に失敗しました");
+        }
+
         const [actionTypesData, selectorsData, stepsData] = await Promise.all([
           actionTypesRes.json(),
           selectorsRes.json(),
           stepsRes.json(),
         ]);
 
+        // データの型チェック
+        if (!Array.isArray(actionTypesData)) {
+          throw new Error("アクションタイプのデータ形式が不正です");
+        }
+        if (!Array.isArray(selectorsData)) {
+          throw new Error("セレクタのデータ形式が不正です");
+        }
+        if (!Array.isArray(stepsData)) {
+          throw new Error("ステップのデータ形式が不正です");
+        }
+
+        console.log('Fetched steps data:', stepsData); // デバッグ用
+
         setActionTypes(actionTypesData);
         setSelectors(selectorsData);
         setSteps(stepsData);
       } catch (error) {
         console.error("データの取得に失敗しました:", error);
-        setError("データの取得に失敗しました");
+        setError(error instanceof Error ? error.message : "データの取得に失敗しました");
       } finally {
         setLoading(false);
       }
@@ -174,11 +192,16 @@ export default function TestStepGrid({
         return;
       }
 
+      // stepsが配列でない場合の対策
+      if (!Array.isArray(steps)) {
+        setError("ステップデータが不正です");
+        return;
+      }
+
       // 現在の最大order_indexを取得
-      const maxOrderIndex = steps.reduce(
-        (max, step) => Math.max(max, step.order_index || 0),
-        0
-      );
+      const maxOrderIndex = steps.length > 0 
+        ? Math.max(...steps.map(step => step.order_index || 0))
+        : 0;
 
       // 新規ステップを作成（仮のIDを設定）
       const tempStep: TestStep = {
@@ -295,211 +318,207 @@ export default function TestStepGrid({
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-4">
-        <button
-          onClick={handleAdd}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          ステップを追加
-        </button>
-      </div>
-
-      <div className="border rounded">
-        {/* ヘッダー行 */}
-        <div className="grid grid-cols-7 gap-2 p-2 bg-gray-100 font-bold border-b">
-          <div className="col-span-1">順序</div>
-          <div className="col-span-1">アクション</div>
-          <div className="col-span-1">セレクタ</div>
-          <div className="col-span-1">入力値</div>
-          <div className="col-span-1">検証値</div>
-          <div className="col-span-1">説明</div>
-          <div className="col-span-1">操作</div>
-        </div>
-
-        {/* データ行 */}
-        {steps.map((step) => (
-          <div
-            key={step.id}
-            draggable
-            onDragStart={() => handleDragStart(step)}
-            onDragOver={(e) => handleDragOver(e, step)}
-            onDragEnd={handleDragEnd}
-            className={`grid grid-cols-7 gap-2 p-2 border-b hover:bg-gray-50 ${
-              draggedStep?.id === step.id ? "opacity-50 bg-gray-100" : ""
-            }`}
-          >
-            {editingId === step.id ? (
-              // 編集モード
-              <>
-                <div className="col-span-1 flex items-center">
-                  {step.order_index}
-                </div>
-                <div className="col-span-1">
-                  <select
-                    value={step.action_type_id}
-                    onChange={(e) =>
-                      setSteps(
-                        steps.map((s) =>
-                          s.id === step.id
-                            ? { ...s, action_type_id: Number(e.target.value) }
-                            : s
-                        )
-                      )
-                    }
-                    className="w-full p-1 border rounded"
-                  >
-                    {actionTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-1">
-                  <select
-                    value={step.selector_id || ""}
-                    onChange={(e) =>
-                      setSteps(
-                        steps.map((s) =>
-                          s.id === step.id
-                            ? {
-                                ...s,
-                                selector_id: e.target.value
-                                  ? Number(e.target.value)
-                                  : null,
-                              }
-                            : s
-                        )
-                      )
-                    }
-                    className="w-full p-1 border rounded"
-                  >
-                    <option value="">選択してください</option>
-                    {selectors.map((selector) => (
-                      <option key={selector.id} value={selector.id}>
-                        {selector.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-1">
-                  <input
-                    type="text"
-                    value={step.input_value || ""}
-                    onChange={(e) =>
-                      setSteps(
-                        steps.map((s) =>
-                          s.id === step.id
-                            ? { ...s, input_value: e.target.value }
-                            : s
-                        )
-                      )
-                    }
-                    className="w-full p-1 border rounded"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <input
-                    type="text"
-                    value={step.assertion_value || ""}
-                    onChange={(e) =>
-                      setSteps(
-                        steps.map((s) =>
-                          s.id === step.id
-                            ? { ...s, assertion_value: e.target.value }
-                            : s
-                        )
-                      )
-                    }
-                    className="w-full p-1 border rounded"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <input
-                    type="text"
-                    value={step.description || ""}
-                    onChange={(e) =>
-                      setSteps(
-                        steps.map((s) =>
-                          s.id === step.id
-                            ? { ...s, description: e.target.value }
-                            : s
-                        )
-                      )
-                    }
-                    className="w-full p-1 border rounded"
-                  />
-                </div>
-                <div className="col-span-1 flex gap-2">
-                  <button
-                    onClick={() =>
-                      step.id === -1 ? handleSave(step) : handleUpdate(step)
-                    }
-                    className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (step.id === -1) {
-                        // 新規作成をキャンセルする場合は、ステップを削除
-                        setSteps(steps.filter((s) => s.id !== -1));
-                      }
-                      setEditingId(null);
-                    }}
-                    className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                  >
-                    キャンセル
-                  </button>
-                </div>
-              </>
-            ) : (
-              // 表示モード
-              <>
-                <div className="col-span-1 flex items-center cursor-move">
-                  {step.order_index}
-                </div>
-                <div className="col-span-1">
-                  {actionTypes.find((t) => t.id === step.action_type_id)?.name}
-                </div>
-                <div className="col-span-1">
-                  {selectors.find((s) => s.id === step.selector_id)?.name}
-                </div>
-                <div className="col-span-1">{step.input_value}</div>
-                <div className="col-span-1">{step.assertion_value}</div>
-                <div className="col-span-1">{step.description}</div>
-                <div className="col-span-1 flex gap-2">
-                  <button
-                    onClick={() => setEditingId(step.id)}
-                    className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    編集
-                  </button>
-                  <button
-                    onClick={() => handleDelete(step.id)}
-                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    削除
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-
+    <div className="space-y-4">
       {error && (
-        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+        <div className="text-red-600 bg-red-50 p-4 rounded">
           {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 text-red-500 hover:text-red-700"
-          >
-            ×
-          </button>
         </div>
       )}
+      
+      <div className="grid gap-4">
+        <div className="mb-4">
+          <button
+            onClick={handleAdd}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            ステップを追加
+          </button>
+        </div>
+
+        <div className="border rounded">
+          {/* ヘッダー行 */}
+          <div className="grid grid-cols-7 gap-2 p-2 bg-gray-100 font-bold border-b">
+            <div className="col-span-1">順序</div>
+            <div className="col-span-1">アクション</div>
+            <div className="col-span-1">セレクタ</div>
+            <div className="col-span-1">入力値</div>
+            <div className="col-span-1">検証値</div>
+            <div className="col-span-1">説明</div>
+            <div className="col-span-1">操作</div>
+          </div>
+
+          {/* データ行 */}
+          {Array.isArray(steps) && steps.map((step) => (
+            <div
+              key={step.id}
+              draggable
+              onDragStart={() => handleDragStart(step)}
+              onDragOver={(e) => handleDragOver(e, step)}
+              onDragEnd={handleDragEnd}
+              className={`grid grid-cols-7 gap-2 p-2 border-b hover:bg-gray-50 ${
+                draggedStep?.id === step.id ? "opacity-50 bg-gray-100" : ""
+              }`}
+            >
+              {editingId === step.id ? (
+                // 編集モード
+                <>
+                  <div className="col-span-1 flex items-center">
+                    {step.order_index}
+                  </div>
+                  <div className="col-span-1">
+                    <select
+                      value={step.action_type_id}
+                      onChange={(e) =>
+                        setSteps(
+                          steps.map((s) =>
+                            s.id === step.id
+                              ? { ...s, action_type_id: Number(e.target.value) }
+                              : s
+                          )
+                        )
+                      }
+                      className="w-full p-1 border rounded"
+                    >
+                      {actionTypes.map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    <select
+                      value={step.selector_id || ""}
+                      onChange={(e) =>
+                        setSteps(
+                          steps.map((s) =>
+                            s.id === step.id
+                              ? {
+                                  ...s,
+                                  selector_id: e.target.value
+                                    ? Number(e.target.value)
+                                    : null,
+                                }
+                              : s
+                          )
+                        )
+                      }
+                      className="w-full p-1 border rounded"
+                    >
+                      <option value="">選択してください</option>
+                      {selectors.map((selector) => (
+                        <option key={selector.id} value={selector.id}>
+                          {selector.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      type="text"
+                      value={step.input_value || ""}
+                      onChange={(e) =>
+                        setSteps(
+                          steps.map((s) =>
+                            s.id === step.id
+                              ? { ...s, input_value: e.target.value }
+                              : s
+                          )
+                        )
+                      }
+                      className="w-full p-1 border rounded"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      type="text"
+                      value={step.assertion_value || ""}
+                      onChange={(e) =>
+                        setSteps(
+                          steps.map((s) =>
+                            s.id === step.id
+                              ? { ...s, assertion_value: e.target.value }
+                              : s
+                          )
+                        )
+                      }
+                      className="w-full p-1 border rounded"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      type="text"
+                      value={step.description || ""}
+                      onChange={(e) =>
+                        setSteps(
+                          steps.map((s) =>
+                            s.id === step.id
+                              ? { ...s, description: e.target.value }
+                              : s
+                          )
+                        )
+                      }
+                      className="w-full p-1 border rounded"
+                    />
+                  </div>
+                  <div className="col-span-1 flex gap-2">
+                    <button
+                      onClick={() =>
+                        step.id === -1 ? handleSave(step) : handleUpdate(step)
+                      }
+                      className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                    >
+                      保存
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (step.id === -1) {
+                          // 新規作成をキャンセルする場合は、ステップを削除
+                          setSteps(steps.filter((s) => s.id !== -1));
+                        }
+                        setEditingId(null);
+                      }}
+                      className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </>
+              ) : (
+                // 表示モード
+                <>
+                  <div className="col-span-1 flex items-center cursor-move">
+                    {step.order_index}
+                  </div>
+                  <div className="col-span-1">
+                    {actionTypes.find((t) => t.id === step.action_type_id)?.name}
+                  </div>
+                  <div className="col-span-1">
+                    {selectors.find((s) => s.id === step.selector_id)?.name}
+                  </div>
+                  <div className="col-span-1">{step.input_value}</div>
+                  <div className="col-span-1">{step.assertion_value}</div>
+                  <div className="col-span-1">{step.description}</div>
+                  <div className="col-span-1 flex gap-2">
+                    <button
+                      onClick={() => setEditingId(step.id)}
+                      className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      編集
+                    </button>
+                    <button
+                      onClick={() => handleDelete(step.id)}
+                      className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      削除
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

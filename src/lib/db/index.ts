@@ -95,4 +95,6 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
   await closeDatabase();
   process.exit(0);
-}); 
+});
+
+export { initializeDatabase } from './init'; 
