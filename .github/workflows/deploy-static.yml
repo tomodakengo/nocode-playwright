@@ -1,0 +1,62 @@
+name: Build Static and Deploy via FTP
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run lint
+      run: npm run lint
+      
+    - name: Create next.config.js for static export
+      run: |
+        cat > next.config.js << 'EOF'
+        /** @type {import('next').NextConfig} */
+        const nextConfig = {
+          output: 'export',
+          trailingSlash: true,
+          images: {
+            unoptimized: true
+          }
+        }
+        
+        module.exports = nextConfig
+        EOF
+      
+    - name: Build project for static export
+      run: npm run build
+      
+    - name: Deploy to server via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: "out/"
+        server-dir: "/"
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          **/.env*
+          **/README.md
+          
+    - name: Clean up
+      run: rm -f next.config.js
