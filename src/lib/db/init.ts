@@ -30,19 +30,87 @@ const initializeDatabase = async () => {
           );
         `);
 
-        // 基本的なアクションタイプの登録
+        // 包括的なアクションタイプの登録（Playwrightメソッドを網羅）
         await db.exec(`
           INSERT OR IGNORE INTO action_types (name, description, has_value, has_selector, has_assertion) VALUES
+          -- 基本的なインタラクション
           ('click', 'クリックアクション', 0, 1, 0),
-          ('type', 'テキスト入力', 1, 1, 0),
+          ('double_click', 'ダブルクリック', 0, 1, 0),
+          ('right_click', '右クリック（コンテキストメニュー）', 0, 1, 0),
+          ('hover', 'マウスホバー', 0, 1, 0),
+          ('focus', '要素にフォーカス', 0, 1, 0),
+          ('blur', 'フォーカスを外す', 0, 1, 0),
+          
+          -- テキスト入力・編集
+          ('type', 'テキスト入力（文字ずつ）', 1, 1, 0),
+          ('fill', 'テキスト入力（一括）', 1, 1, 0),
+          ('clear', 'テキストクリア', 0, 1, 0),
+          ('press', 'キー入力', 1, 0, 0),
+          ('press_sequentially', '複数キーの順次入力', 1, 0, 0),
+          
+          -- フォーム操作
+          ('check', 'チェックボックスON', 0, 1, 0),
+          ('uncheck', 'チェックボックスOFF', 0, 1, 0),
+          ('select_option', 'ドロップダウン選択（値）', 1, 1, 0),
+          ('select_text', 'ドロップダウン選択（テキスト）', 1, 1, 0),
+          ('upload_file', 'ファイルアップロード', 1, 1, 0),
+          ('set_input_files', '複数ファイル選択', 1, 1, 0),
+          
+          -- ページナビゲーション
+          ('navigate', 'ページ遷移', 1, 0, 0),
+          ('go_back', 'ブラウザの戻るボタン', 0, 0, 0),
+          ('go_forward', 'ブラウザの進むボタン', 0, 0, 0),
+          ('reload', 'ページリロード', 0, 0, 0),
+          ('close_page', 'ページを閉じる', 0, 0, 0),
+          
+          -- スクロール操作
+          ('scroll_into_view', '要素までスクロール', 0, 1, 0),
+          ('scroll_to_top', 'ページトップへスクロール', 0, 0, 0),
+          ('scroll_to_bottom', 'ページ最下部へスクロール', 0, 0, 0),
+          ('scroll_by', '指定ピクセル数スクロール', 1, 0, 0),
+          
+          -- ドラッグ&ドロップ
+          ('drag_and_drop', 'ドラッグ&ドロップ', 1, 1, 0),
+          ('drag_to', '要素をドラッグ', 0, 1, 0),
+          
+          -- 待機操作
           ('wait', '要素の待機', 0, 1, 0),
+          ('wait_for_selector', 'セレクタ待機', 1, 0, 0),
+          ('wait_for_text', 'テキスト待機', 1, 0, 0),
+          ('wait_for_url', 'URL待機', 1, 0, 0),
+          ('wait_for_load_state', 'ページ読み込み待機', 1, 0, 0),
+          ('wait_for_timeout', 'タイムアウト待機', 1, 0, 0),
+          
+          -- アサーション（検証）
           ('assert_visible', '要素の表示確認', 0, 1, 0),
+          ('assert_hidden', '要素の非表示確認', 0, 1, 0),
           ('assert_text', 'テキスト内容の確認', 1, 1, 1),
           ('assert_value', '入力値の確認', 1, 1, 1),
-          ('hover', 'マウスホバー', 0, 1, 0),
-          ('press', 'キー入力', 1, 0, 0),
-          ('navigate', 'ページ遷移', 1, 0, 0),
-          ('screenshot', 'スクリーンショット', 1, 0, 0);
+          ('assert_attribute', '属性値の確認', 1, 1, 1),
+          ('assert_url', 'URL確認', 1, 0, 1),
+          ('assert_title', 'ページタイトル確認', 1, 0, 1),
+          ('assert_count', '要素数の確認', 1, 1, 1),
+          ('assert_enabled', '要素の有効確認', 0, 1, 0),
+          ('assert_disabled', '要素の無効確認', 0, 1, 0),
+          ('assert_checked', 'チェックボックスON確認', 0, 1, 0),
+          ('assert_unchecked', 'チェックボックスOFF確認', 0, 1, 0),
+          ('assert_contains_text', 'テキスト部分一致確認', 1, 1, 1),
+          
+          -- スクリーンショット・レポート
+          ('screenshot', 'スクリーンショット', 1, 0, 0),
+          ('screenshot_element', '要素のスクリーンショット', 1, 1, 0),
+          ('add_annotation', 'テスト注釈追加', 1, 0, 0),
+          
+          -- ウィンドウ・タブ操作
+          ('new_tab', '新しいタブを開く', 0, 0, 0),
+          ('close_tab', 'タブを閉じる', 0, 0, 0),
+          ('switch_tab', 'タブ切り替え', 1, 0, 0),
+          ('set_viewport_size', 'ビューポートサイズ設定', 1, 0, 0),
+          
+          -- その他
+          ('evaluate', 'JavaScript実行', 1, 0, 0),
+          ('add_locator_handler', 'ポップアップハンドラー', 1, 1, 0),
+          ('set_default_timeout', 'デフォルトタイムアウト設定', 1, 0, 0);
         `);
 
         // テーブル作成
