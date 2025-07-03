@@ -261,7 +261,7 @@ async function executeStep(page: Page, step: any): Promise<void> {
             break;
         case 'scroll_by':
             const [x, y] = inputValue.split(',').map((v: string) => parseInt(v.trim()) || 0);
-            await page.evaluate(([x, y]) => window.scrollBy(x, y), [x, y]);
+            await page.evaluate(([x, y]: [number, number]) => window.scrollBy(x, y), [x, y]);
             break;
 
         // ドラッグ&ドロップ
@@ -277,7 +277,7 @@ async function executeStep(page: Page, step: any): Promise<void> {
             await page.waitForSelector(inputValue);
             break;
         case 'wait_for_text':
-            await page.waitForFunction((text) => document.body.innerText.includes(text), inputValue);
+            await page.waitForFunction((text: string) => document.body.innerText.includes(text), inputValue);
             break;
         case 'wait_for_url':
             await page.waitForURL(inputValue);
