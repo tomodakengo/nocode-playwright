@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { 
-  PlayIcon, 
-  PlusIcon, 
-  TrashIcon, 
-  EyeIcon,
-  PencilIcon,
-  DocumentDuplicateIcon,
-  ExclamationTriangleIcon
+  PlayArrow as PlayIcon, 
+  Add as PlusIcon, 
+  Delete as TrashIcon, 
+  Visibility as EyeIcon,
+  Edit as PencilIcon,
+  ContentCopy as DocumentDuplicateIcon,
+  Warning as ExclamationTriangleIcon
 } from '@mui/icons-material';
 import { ActionType, TestStep, Selector } from '@/types';
 
@@ -38,11 +38,7 @@ const DragDropTestBuilder: React.FC<DragDropTestBuilderProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [testCaseId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [actionTypesRes, selectorsRes, stepsRes] = await Promise.all([
@@ -78,14 +74,20 @@ const DragDropTestBuilder: React.FC<DragDropTestBuilderProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [testCaseId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
 
     const newSteps = Array.from(steps);
     const [reorderedItem] = newSteps.splice(result.source.index, 1);
-    newSteps.splice(result.destination.index, 0, reorderedItem);
+    if (reorderedItem) {
+      newSteps.splice(result.destination.index, 0, reorderedItem);
+    }
 
     // 順序インデックスを更新
     const updatedSteps = newSteps.map((step, index) => ({
