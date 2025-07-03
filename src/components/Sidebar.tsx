@@ -15,6 +15,16 @@ export default function Sidebar() {
         <ul className="space-y-2">
           <li>
             <Link
+              href="/test-builder"
+              className={`block px-4 py-2 rounded hover:bg-gray-700 ${
+                isActive("/test-builder") ? "bg-gray-700" : ""
+              }`}
+            >
+              🧪 テストビルダー
+            </Link>
+          </li>
+          <li>
+            <Link
               href="/test-suites"
               className={`block px-4 py-2 rounded hover:bg-gray-700 ${
                 isActive("/test-suites") ? "bg-gray-700" : ""
