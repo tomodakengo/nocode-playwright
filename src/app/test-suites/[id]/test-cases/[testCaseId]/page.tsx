@@ -243,7 +243,7 @@ export default function TestCaseDetail({
         <h2 className="text-lg font-medium text-gray-900 mb-4">
           テストステップ
         </h2>
-        <TestStepGrid testCaseId={params.testCaseId} />
+        <TestStepGrid testCaseId={parseInt(params.testCaseId)} />
       </div>
 
       {/* 生成されたコードのプレビュー */}

@@ -1,7 +1,8 @@
 import { ACTION_ICONS, STATUS_COLORS } from './constants';
 
 export function getActionIcon(actionName: string): string {
-  return ACTION_ICONS[actionName] ?? ACTION_ICONS.default;
+  const icon = ACTION_ICONS[actionName];
+  return icon || ACTION_ICONS.default || '🔧';
 }
 
 export function getStatusColor(status?: string): string {
@@ -37,7 +38,7 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: number;
+  let timeout: ReturnType<typeof setTimeout>;
   
   return (...args: Parameters<T>) => {
     clearTimeout(timeout);

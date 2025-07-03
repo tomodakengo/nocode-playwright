@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PlayIcon, PlusIcon } from '@mui/icons-material';
+import { PlayArrow as PlayIcon, Add as PlusIcon } from '@mui/icons-material';
 import { ExecutionResult } from '@/types';
 
 interface TestBuilderHeaderProps {

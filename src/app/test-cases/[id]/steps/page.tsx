@@ -35,7 +35,7 @@ export default function TestStepsPage({ params }: { params: { id: string } }) {
         </Button>
       </div>
 
-      <TestStepGrid testCaseId={params.id} />
+      <TestStepGrid testCaseId={parseInt(params.id)} />
 
       {showPreview && (
         <div className="mt-8">

@@ -91,7 +91,9 @@ export default function TestStepList({
 
     const items = Array.from(steps);
     const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    if (reorderedItem) {
+      items.splice(result.destination.index, 0, reorderedItem);
+    }
 
     // 順序インデックスを更新
     const updatedItems = items.map((item, index) => ({

@@ -80,7 +80,7 @@ export function useTestSteps({
 
   const addStep = useCallback(async () => {
     try {
-      if (!actionTypes.length) {
+      if (!actionTypes.length || !actionTypes[0]) {
         setError('アクションタイプが設定されていません');
         return;
       }

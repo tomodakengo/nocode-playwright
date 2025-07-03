@@ -29,6 +29,10 @@ interface NotificationProviderProps {
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const [notifications, setNotifications] = useState<NotificationState[]>([]);
 
+  const removeNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, []);
+
   const showNotification = useCallback((notification: Omit<NotificationState, 'id'>) => {
     const id = generateId();
     const newNotification: NotificationState = {
@@ -45,11 +49,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         removeNotification(id);
       }, newNotification.duration);
     }
-  }, []);
-
-  const removeNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-  }, []);
+  }, [removeNotification]);
 
   const clearAllNotifications = useCallback(() => {
     setNotifications([]);

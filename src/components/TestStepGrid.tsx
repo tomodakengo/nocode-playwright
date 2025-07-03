@@ -204,10 +204,16 @@ export default function TestStepGrid({
         : 0;
 
       // 新規ステップを作成（仮のIDを設定）
+      // バリデーション：アクションタイプが存在することを確認
+      if (!actionTypes.length || !actionTypes[0]) {
+        setError("アクションタイプが設定されていません");
+        return;
+      }
+
       const tempStep: TestStep = {
         id: -1, // 仮のID
         test_case_id: Number(testCaseId),
-        action_type_id: actionTypes[0]?.id,
+        action_type_id: actionTypes[0].id,
         selector_id: null,
         input_value: "",
         assertion_value: "",

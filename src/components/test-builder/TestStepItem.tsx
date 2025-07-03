@@ -2,14 +2,14 @@
 
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { PencilIcon, TrashIcon } from '@mui/icons-material';
+import { Edit as PencilIcon, Delete as TrashIcon } from '@mui/icons-material';
 import { TestStepWithDetails } from '@/types';
 import { getActionIcon, getStatusColor } from '@/lib/utils';
 
 interface TestStepItemProps {
   step: TestStepWithDetails;
   index: number;
-  stepStatus?: string;
+  stepStatus?: string | undefined;
   onEdit: (step: TestStepWithDetails) => void;
   onDelete: (stepId: number) => void;
 }
